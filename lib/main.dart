@@ -25,7 +25,6 @@ class SPTAApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
         useMaterial3: true,
-        fontFamily: 'sans-serif',
         scaffoldBackgroundColor: const Color(0xFFF0F4FF),
         appBarTheme: const AppBarTheme(
           systemOverlayStyle: SystemUiOverlayStyle(

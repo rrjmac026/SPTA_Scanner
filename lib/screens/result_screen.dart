@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../helpers/database_helper.dart';
 import 'scanner_screen.dart';
@@ -7,11 +8,7 @@ class ResultScreen extends StatefulWidget {
   final String name;
   final String lrn;
 
-  const ResultScreen({
-    super.key,
-    required this.name,
-    required this.lrn,
-  });
+  const ResultScreen({super.key, required this.name, required this.lrn});
 
   @override
   State<ResultScreen> createState() => _ResultScreenState();
@@ -20,26 +17,39 @@ class ResultScreen extends StatefulWidget {
 class _ResultScreenState extends State<ResultScreen>
     with SingleTickerProviderStateMixin {
   final DatabaseHelper _dbHelper = DatabaseHelper();
+  final _amountController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
   bool _isLoading = false;
   bool _isSaved = false;
   bool _alreadyExists = false;
+  String _selectedGrade = 'Grade 7';
+
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
+
+  final List<String> _grades = [
+    'Grade 7',
+    'Grade 8',
+    'Grade 9',
+    'Grade 10',
+    'Grade 11',
+    'Grade 12',
+  ];
 
   @override
   void initState() {
     super.initState();
     _animController = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
     _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _slideAnim = Tween<Offset>(
-      begin: const Offset(0, 0.2),
+      begin: const Offset(0, 0.15),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
-
     _animController.forward();
     _checkIfExists();
   }
@@ -47,6 +57,7 @@ class _ResultScreenState extends State<ResultScreen>
   @override
   void dispose() {
     _animController.dispose();
+    _amountController.dispose();
     super.dispose();
   }
 
@@ -63,12 +74,17 @@ class _ResultScreenState extends State<ResultScreen>
   }
 
   Future<void> _markAsPaid() async {
+    if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
+    final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
     final now = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
+
     final student = Student(
       name: widget.name,
       lrn: widget.lrn,
+      grade: _selectedGrade,
+      amount: amount,
       paymentStatus: 'Paid',
       createdAt: now,
     );
@@ -106,17 +122,13 @@ class _ResultScreenState extends State<ResultScreen>
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
+              child: Text(message,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
             ),
           ],
         ),
-        backgroundColor: isSuccess ? const Color(0xFF16A34A) : const Color(0xFFF59E0B),
+        backgroundColor:
+            isSuccess ? const Color(0xFF16A34A) : const Color(0xFFF59E0B),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
@@ -137,22 +149,15 @@ class _ResultScreenState extends State<ResultScreen>
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Scan Result',
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 17,
-          ),
-        ),
+        title: const Text('Scan Result',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
         actions: [
           IconButton(
             icon: const Icon(Icons.qr_code_scanner_rounded),
-            onPressed: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const ScannerScreen()),
-              );
-            },
+            onPressed: () => Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const ScannerScreen()),
+            ),
             tooltip: 'Scan Another',
           ),
         ],
@@ -162,289 +167,470 @@ class _ResultScreenState extends State<ResultScreen>
         child: SlideTransition(
           position: _slideAnim,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Status badge
-                if (_isSaved)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 20),
-                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
-                    decoration: BoxDecoration(
-                      color: _alreadyExists
-                          ? const Color(0xFFFEF3C7)
-                          : const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
+            padding: const EdgeInsets.all(20),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Status badge (only after saving)
+                  if (_isSaved)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 14, horizontal: 18),
+                      decoration: BoxDecoration(
                         color: _alreadyExists
-                            ? const Color(0xFFF59E0B)
-                            : const Color(0xFF22C55E),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _alreadyExists
-                              ? Icons.warning_amber_rounded
-                              : Icons.check_circle_rounded,
+                            ? const Color(0xFFFEF3C7)
+                            : const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
                           color: _alreadyExists
                               ? const Color(0xFFF59E0B)
-                              : const Color(0xFF16A34A),
-                          size: 24,
+                              : const Color(0xFF22C55E),
+                          width: 1.5,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
                             _alreadyExists
-                                ? 'Student already paid SPTA'
-                                : 'Payment recorded successfully!',
-                            style: TextStyle(
-                              color: _alreadyExists
-                                  ? const Color(0xFF92400E)
-                                  : const Color(0xFF166534),
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
+                                ? Icons.warning_amber_rounded
+                                : Icons.check_circle_rounded,
+                            color: _alreadyExists
+                                ? const Color(0xFFF59E0B)
+                                : const Color(0xFF16A34A),
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _alreadyExists
+                                  ? 'Student already paid SPTA'
+                                  : 'Payment recorded successfully!',
+                              style: TextStyle(
+                                color: _alreadyExists
+                                    ? const Color(0xFF92400E)
+                                    : const Color(0xFF166534),
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // Student Info Card
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF2563EB).withOpacity(0.08),
+                          blurRadius: 20,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        // Card header
+                        Container(
+                          padding: const EdgeInsets.all(18),
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF1A3A6B), Color(0xFF2563EB)],
+                            ),
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(20),
+                              topRight: Radius.circular(20),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.person_rounded,
+                                    color: Colors.white, size: 28),
+                              ),
+                              const SizedBox(width: 14),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Student Information',
+                                        style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700)),
+                                    Text('QR Code Data',
+                                        style: TextStyle(
+                                            color: Colors.white60,
+                                            fontSize: 11.5)),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color:
+                                      const Color(0xFF22C55E).withOpacity(0.25),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                      color: const Color(0xFF22C55E)
+                                          .withOpacity(0.5)),
+                                ),
+                                child: const Text('SCANNED',
+                                    style: TextStyle(
+                                        color: Color(0xFF86EFAC),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.8)),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Name & LRN
+                        Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Column(
+                            children: [
+                              _buildInfoRow(
+                                icon: Icons.badge_rounded,
+                                label: 'Name',
+                                value: widget.name.isNotEmpty
+                                    ? widget.name
+                                    : 'Not detected',
+                                valueColor: widget.name.isNotEmpty
+                                    ? const Color(0xFF1A3A6B)
+                                    : Colors.red,
+                              ),
+                              Divider(color: Colors.grey[100], height: 22),
+                              _buildInfoRow(
+                                icon: Icons.numbers_rounded,
+                                label: 'LRN',
+                                value: widget.lrn.isNotEmpty
+                                    ? widget.lrn
+                                    : 'Not detected',
+                                valueColor: widget.lrn.isNotEmpty
+                                    ? const Color(0xFF1A3A6B)
+                                    : Colors.red,
+                                isMonospace: true,
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
 
-                // Student info card
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF2563EB).withOpacity(0.08),
-                        blurRadius: 24,
-                        offset: const Offset(0, 6),
+                  const SizedBox(height: 16),
+
+                  // Payment Details Card (Grade + Amount)
+                  if (!_isSaved)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      // Card header
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xFF1A3A6B), Color(0xFF2563EB)],
-                          ),
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(20),
-                            topRight: Radius.circular(20),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 52,
-                              height: 52,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                shape: BoxShape.circle,
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEFF6FF),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.receipt_long_rounded,
+                                    color: Color(0xFF2563EB), size: 18),
                               ),
-                              child: const Icon(
-                                Icons.person_rounded,
-                                color: Colors.white,
-                                size: 30,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Student Information',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  Text(
-                                    'QR Code Data',
-                                    style: TextStyle(
-                                      color: Colors.white60,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF22C55E).withOpacity(0.25),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                    color: const Color(0xFF22C55E)
-                                        .withOpacity(0.5)),
-                              ),
-                              child: const Text(
-                                'SCANNED',
+                              const SizedBox(width: 10),
+                              const Text(
+                                'Payment Details',
                                 style: TextStyle(
-                                  color: Color(0xFF86EFAC),
-                                  fontSize: 10,
+                                  color: Color(0xFF1A3A6B),
+                                  fontSize: 15,
                                   fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.8,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
+                            ],
+                          ),
+                          const SizedBox(height: 18),
 
-                      // Student fields
-                      Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          children: [
-                            _buildInfoRow(
-                              icon: Icons.badge_rounded,
-                              label: 'Name',
-                              value: widget.name.isNotEmpty
-                                  ? widget.name
-                                  : 'Not detected',
-                              valueColor: widget.name.isNotEmpty
-                                  ? const Color(0xFF1A3A6B)
-                                  : Colors.red,
+                          // Grade selector
+                          Text('Grade Level',
+                              style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.4)),
+                          const SizedBox(height: 8),
+                          Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: const Color(0xFFCBD5E1)),
+                              borderRadius: BorderRadius.circular(12),
+                              color: const Color(0xFFF8FAFC),
                             ),
-                            const SizedBox(height: 4),
-                            Divider(color: Colors.grey[100], height: 24),
-                            _buildInfoRow(
-                              icon: Icons.numbers_rounded,
-                              label: 'LRN',
-                              value: widget.lrn.isNotEmpty
-                                  ? widget.lrn
-                                  : 'Not detected',
-                              valueColor: widget.lrn.isNotEmpty
-                                  ? const Color(0xFF1A3A6B)
-                                  : Colors.red,
-                              isMonospace: true,
-                            ),
-                            const SizedBox(height: 4),
-                            Divider(color: Colors.grey[100], height: 24),
-                            _buildInfoRow(
-                              icon: Icons.payment_rounded,
-                              label: 'Payment Status',
-                              value: _isSaved ? 'Paid' : 'Pending',
-                              valueColor: _isSaved
-                                  ? const Color(0xFF16A34A)
-                                  : const Color(0xFFF59E0B),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 28),
-
-                // Mark as Paid button
-                if (!_isSaved) ...[
-                  SizedBox(
-                    height: 58,
-                    child: ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _markAsPaid,
-                      icon: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white,
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: _selectedGrade,
+                                isExpanded: true,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 4),
+                                borderRadius: BorderRadius.circular(12),
+                                icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                                    color: Color(0xFF2563EB)),
+                                items: _grades.map((grade) {
+                                  return DropdownMenuItem(
+                                    value: grade,
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 28,
+                                          height: 28,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFEFF6FF),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              grade.split(' ').last,
+                                              style: const TextStyle(
+                                                  color: Color(0xFF2563EB),
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w800),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Text(grade,
+                                            style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500)),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (v) =>
+                                    setState(() => _selectedGrade = v!),
                               ),
-                            )
-                          : const Icon(Icons.check_circle_rounded, size: 22),
-                      label: Text(
-                        _isLoading ? 'Saving...' : 'Mark SPTA Paid',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.3,
-                        ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // Amount field
+                          Text('Amount Paid (₱)',
+                              style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.4)),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _amountController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                  RegExp(r'^\d+\.?\d{0,2}')),
+                            ],
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Please enter the amount paid';
+                              }
+                              final amount = double.tryParse(v.trim());
+                              if (amount == null || amount <= 0) {
+                                return 'Please enter a valid amount';
+                              }
+                              return null;
+                            },
+                            decoration: InputDecoration(
+                              hintText: '0.00',
+                              prefixIcon: Container(
+                                width: 42,
+                                height: 42,
+                                alignment: Alignment.center,
+                                child: const Text('₱',
+                                    style: TextStyle(
+                                        color: Color(0xFF2563EB),
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700)),
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFF8FAFC),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 14),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide:
+                                    const BorderSide(color: Color(0xFFCBD5E1)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide:
+                                    const BorderSide(color: Color(0xFFCBD5E1)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFF2563EB), width: 2),
+                              ),
+                              errorBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide:
+                                    const BorderSide(color: Colors.red),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF16A34A),
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor:
-                            const Color(0xFF16A34A).withOpacity(0.6),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                    ),
+
+                  // Saved payment details (read-only view after saving)
+                  if (_isSaved && !_alreadyExists)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          _buildInfoRow(
+                            icon: Icons.school_rounded,
+                            label: 'Grade Level',
+                            value: _selectedGrade,
+                            valueColor: const Color(0xFF1A3A6B),
+                          ),
+                          Divider(color: Colors.grey[100], height: 22),
+                          _buildInfoRow(
+                            icon: Icons.payments_rounded,
+                            label: 'Amount Paid',
+                            value:
+                                '₱${double.tryParse(_amountController.text)?.toStringAsFixed(2) ?? '0.00'}',
+                            valueColor: const Color(0xFF16A34A),
+                          ),
+                          Divider(color: Colors.grey[100], height: 22),
+                          _buildInfoRow(
+                            icon: Icons.check_circle_rounded,
+                            label: 'Payment Status',
+                            value: 'Paid',
+                            valueColor: const Color(0xFF16A34A),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  const SizedBox(height: 24),
+
+                  // Mark as Paid button
+                  if (!_isSaved)
+                    SizedBox(
+                      height: 56,
+                      child: ElevatedButton.icon(
+                        onPressed: _isLoading ? null : _markAsPaid,
+                        icon: _isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2.5, color: Colors.white),
+                              )
+                            : const Icon(Icons.check_circle_rounded, size: 22),
+                        label: Text(
+                          _isLoading ? 'Saving...' : 'Mark SPTA Paid',
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF16A34A),
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor:
+                              const Color(0xFF16A34A).withOpacity(0.6),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
 
-                // Scan another button
-                SizedBox(
-                  height: 52,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pushReplacement(
+                  if (!_isSaved) const SizedBox(height: 10),
+
+                  // Scan another
+                  SizedBox(
+                    height: 50,
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => const ScannerScreen(),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
-                    label: const Text(
-                      'Scan Another Student',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
+                        MaterialPageRoute(builder: (_) => const ScannerScreen()),
                       ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF2563EB),
-                      side: const BorderSide(
-                          color: Color(0xFF2563EB), width: 1.5),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                      icon:
+                          const Icon(Icons.qr_code_scanner_rounded, size: 20),
+                      label: const Text('Scan Another Student',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w600)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF2563EB),
+                        side: const BorderSide(
+                            color: Color(0xFF2563EB), width: 1.5),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
                       ),
                     ),
                   ),
-                ),
 
-                const SizedBox(height: 12),
+                  const SizedBox(height: 10),
 
-                // Back to home button
-                SizedBox(
-                  height: 52,
-                  child: TextButton.icon(
-                    onPressed: () {
-                      Navigator.popUntil(context, (route) => route.isFirst);
-                    },
-                    icon: const Icon(Icons.home_rounded, size: 20),
-                    label: const Text(
-                      'Back to Home',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.grey[600],
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                  SizedBox(
+                    height: 50,
+                    child: TextButton.icon(
+                      onPressed: () =>
+                          Navigator.popUntil(context, (r) => r.isFirst),
+                      icon: const Icon(Icons.home_rounded, size: 20),
+                      label: const Text('Back to Home',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w600)),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey[600],
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -463,39 +649,33 @@ class _ResultScreenState extends State<ResultScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 36,
-          height: 36,
+          width: 34,
+          height: 34,
           decoration: BoxDecoration(
             color: const Color(0xFFEFF6FF),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: const Color(0xFF2563EB), size: 18),
+          child: Icon(icon, color: const Color(0xFF2563EB), size: 17),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                value,
-                style: TextStyle(
-                  color: valueColor,
-                  fontSize: 15.5,
-                  fontWeight: FontWeight.w700,
-                  fontFamily: isMonospace ? 'monospace' : null,
-                  letterSpacing: isMonospace ? 1.0 : 0,
-                ),
-              ),
+              Text(label,
+                  style: TextStyle(
+                      color: Colors.grey[500],
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.4)),
+              const SizedBox(height: 2),
+              Text(value,
+                  style: TextStyle(
+                      color: valueColor,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: isMonospace ? 'monospace' : null,
+                      letterSpacing: isMonospace ? 1.0 : 0)),
             ],
           ),
         ),

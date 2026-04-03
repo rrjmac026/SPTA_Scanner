@@ -32,24 +32,18 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
   void _handleBarcode(BarcodeCapture capture) {
     if (_hasScanned) return;
-
-    final List<Barcode> barcodes = capture.barcodes;
-    for (final barcode in barcodes) {
-      final String? rawValue = barcode.rawValue;
+    for (final barcode in capture.barcodes) {
+      final rawValue = barcode.rawValue;
       if (rawValue == null || rawValue.isEmpty) continue;
 
-      // Parse the QR content: two lines
-      // Line 1: Full Name, Line 2: LRN
       final lines = rawValue.trim().split('\n');
-
       String name = '';
       String lrn = '';
 
       if (lines.length >= 2) {
         name = lines[0].trim();
         lrn = lines[1].trim();
-      } else if (lines.length == 1) {
-        // Try splitting by last space if only one line (fallback)
+      } else {
         final parts = rawValue.trim().split(RegExp(r'\s+'));
         if (parts.length >= 2) {
           lrn = parts.last;
@@ -64,7 +58,6 @@ class _ScannerScreenState extends State<ScannerScreen> {
       setState(() => _hasScanned = true);
       _controller?.stop();
 
-      // Navigate to result screen
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -81,44 +74,27 @@ class _ScannerScreenState extends State<ScannerScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Camera preview
           MobileScanner(
             controller: _controller!,
             onDetect: _handleBarcode,
           ),
-
-          // Overlay
           SafeArea(
             child: Column(
               children: [
-                // Top bar
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
                   child: Row(
                     children: [
-                      GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.arrow_back_rounded,
-                              color: Colors.white, size: 22),
-                        ),
-                      ),
+                      _iconBtn(
+                          Icons.arrow_back_rounded, () => Navigator.pop(context)),
                       const Expanded(
-                        child: Text(
-                          'Scan QR Code',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                        child: Text('Scan QR Code',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700)),
                       ),
                       GestureDetector(
                         onTap: () {
@@ -146,60 +122,32 @@ class _ScannerScreenState extends State<ScannerScreen> {
                     ],
                   ),
                 ),
-
                 const Spacer(),
-
-                // Scanner viewfinder
-                Center(
-                  child: SizedBox(
-                    width: 260,
-                    height: 260,
-                    child: Stack(
-                      children: [
-                        // Dimmed outside area (visual guide only)
-                        Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: Colors.transparent,
-                              width: 0,
-                            ),
-                          ),
-                        ),
-                        // Corner decorations
-                        ..._buildCorners(),
-                      ],
-                    ),
-                  ),
+                SizedBox(
+                  width: 260,
+                  height: 260,
+                  child: Stack(children: _buildCorners()),
                 ),
-
                 const SizedBox(height: 28),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 24, vertical: 12),
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.55),
                     borderRadius: BorderRadius.circular(32),
                   ),
-                  child: const Text(
-                    'Align QR code within the frame',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+                  child: const Text('Align QR code within the frame',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500)),
                 ),
-
                 const Spacer(),
-
                 const Padding(
                   padding: EdgeInsets.only(bottom: 40),
-                  child: Text(
-                    'SPTA Payment Verification',
-                    style: TextStyle(
-                      color: Colors.white54,
-                      fontSize: 13,
-                    ),
-                  ),
+                  child: Text('SPTA Payment Verification',
+                      style:
+                          TextStyle(color: Colors.white54, fontSize: 13)),
                 ),
               ],
             ),
@@ -209,77 +157,71 @@ class _ScannerScreenState extends State<ScannerScreen> {
     );
   }
 
-  List<Widget> _buildCorners() {
-    const double size = 28;
-    const double thickness = 4;
-    const Color cornerColor = Color(0xFF2563EB);
-    const radius = Radius.circular(6);
+  Widget _iconBtn(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(icon, color: Colors.white, size: 22),
+      ),
+    );
+  }
 
+  List<Widget> _buildCorners() {
+    const size = 28.0;
+    const thickness = 4.0;
+    const color = Color(0xFF2563EB);
+    const radius = Radius.circular(6);
     return [
-      // Top-left
       Positioned(
-        top: 0,
-        left: 0,
-        child: Container(
-          width: size,
-          height: size,
-          decoration: const BoxDecoration(
-            border: Border(
-              top: BorderSide(color: cornerColor, width: thickness),
-              left: BorderSide(color: cornerColor, width: thickness),
-            ),
-            borderRadius: BorderRadius.only(topLeft: radius),
-          ),
-        ),
-      ),
-      // Top-right
+          top: 0,
+          left: 0,
+          child: _corner(
+              const Border(
+                  top: BorderSide(color: color, width: thickness),
+                  left: BorderSide(color: color, width: thickness)),
+              const BorderRadius.only(topLeft: radius),
+              size)),
       Positioned(
-        top: 0,
-        right: 0,
-        child: Container(
-          width: size,
-          height: size,
-          decoration: const BoxDecoration(
-            border: Border(
-              top: BorderSide(color: cornerColor, width: thickness),
-              right: BorderSide(color: cornerColor, width: thickness),
-            ),
-            borderRadius: BorderRadius.only(topRight: radius),
-          ),
-        ),
-      ),
-      // Bottom-left
+          top: 0,
+          right: 0,
+          child: _corner(
+              const Border(
+                  top: BorderSide(color: color, width: thickness),
+                  right: BorderSide(color: color, width: thickness)),
+              const BorderRadius.only(topRight: radius),
+              size)),
       Positioned(
-        bottom: 0,
-        left: 0,
-        child: Container(
-          width: size,
-          height: size,
-          decoration: const BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: cornerColor, width: thickness),
-              left: BorderSide(color: cornerColor, width: thickness),
-            ),
-            borderRadius: BorderRadius.only(bottomLeft: radius),
-          ),
-        ),
-      ),
-      // Bottom-right
+          bottom: 0,
+          left: 0,
+          child: _corner(
+              const Border(
+                  bottom: BorderSide(color: color, width: thickness),
+                  left: BorderSide(color: color, width: thickness)),
+              const BorderRadius.only(bottomLeft: radius),
+              size)),
       Positioned(
-        bottom: 0,
-        right: 0,
-        child: Container(
-          width: size,
-          height: size,
-          decoration: const BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: cornerColor, width: thickness),
-              right: BorderSide(color: cornerColor, width: thickness),
-            ),
-            borderRadius: BorderRadius.only(bottomRight: radius),
-          ),
-        ),
-      ),
+          bottom: 0,
+          right: 0,
+          child: _corner(
+              const Border(
+                  bottom: BorderSide(color: color, width: thickness),
+                  right: BorderSide(color: color, width: thickness)),
+              const BorderRadius.only(bottomRight: radius),
+              size)),
     ];
+  }
+
+  Widget _corner(Border border, BorderRadius radius, double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(border: border, borderRadius: radius),
+    );
   }
 }

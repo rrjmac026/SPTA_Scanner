@@ -1,7 +1,7 @@
-name: spta_app
+name: spta_scanner_app
 description: SPTA Payment Verification System for Schools
 publish_to: 'none'
-version: 1.0.0+1
+version: 2.0.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -14,6 +14,14 @@ dependencies:
   path_provider: ^2.1.4
   path: ^1.9.0
   intl: ^0.19.0
+  # Excel export
+  excel: ^4.0.6
+  # PDF export
+  pdf: ^3.11.3
+  printing: ^5.13.2
+  # Share / open files
+  share_plus: ^10.1.4
+  open_filex: ^4.5.0
 
 dev_dependencies:
   flutter_test:
