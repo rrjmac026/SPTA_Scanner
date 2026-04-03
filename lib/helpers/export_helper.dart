@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'database_helper.dart';
 
 class ExportHelper {
@@ -198,8 +197,11 @@ class ExportHelper {
                       fontWeight: pw.FontWeight.bold,
                       color: PdfColors.white)),
               pw.SizedBox(height: 4),
+              // Fixed: white70 → use PdfColor with opacity manually
               pw.Text('School Parent-Teacher Association',
-                  style: pw.TextStyle(fontSize: 11, color: PdfColors.white70)),
+                  style: pw.TextStyle(
+                      fontSize: 11,
+                      color: const PdfColor(1, 1, 1, 0.7))),
               pw.SizedBox(height: 12),
               pw.Row(
                 children: [
@@ -222,13 +224,16 @@ class ExportHelper {
     return pw.Container(
       padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: pw.BoxDecoration(
-        color: PdfColors.white24,
+        // Fixed: white24 / white54 → use PdfColor with alpha channel
+        color: const PdfColor(1, 1, 1, 0.15),
         borderRadius: pw.BorderRadius.circular(12),
-        border: pw.Border.all(color: PdfColors.white54),
+        border: pw.Border.all(color: const PdfColor(1, 1, 1, 0.4)),
       ),
       child: pw.Text(text,
           style: pw.TextStyle(
-              fontSize: 9, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
+              fontSize: 9,
+              color: PdfColors.white,
+              fontWeight: pw.FontWeight.bold)),
     );
   }
 
