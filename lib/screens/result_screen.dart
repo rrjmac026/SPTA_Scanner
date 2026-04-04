@@ -32,7 +32,7 @@ class _ResultScreenState extends State<ResultScreen>
   StudentPaymentInfo? _info;
   String _selectedGrade = 'Grade 7';
   bool _isNewStudent = false;
-  bool _tempLinkChecked = false; // whether we've already checked for temp matches
+  bool _tempLinkChecked = false;
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -68,13 +68,11 @@ class _ResultScreenState extends State<ResultScreen>
     setState(() => _isLoading = true);
     final info = await _db.getStudentPaymentInfo(widget.lrn);
     if (info == null) {
-      // ── New student: check for walk-in temp records first ─────────────
       if (!_tempLinkChecked) {
         _tempLinkChecked = true;
         final candidates = await _db.findTempCandidates(widget.name);
         if (candidates.isNotEmpty && mounted) {
           setState(() => _isLoading = false);
-          // Give the UI a moment to settle before showing the sheet
           await Future.delayed(const Duration(milliseconds: 400));
           if (!mounted) return;
           final chosen = await LinkTempSheet.show(
@@ -89,30 +87,45 @@ class _ResultScreenState extends State<ResultScreen>
           }
         }
       }
-      setState(() {
-        _isNewStudent = true;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isNewStudent = true;
+          _isLoading = false;
+        });
+      }
       return;
     }
-    setState(() {
-      _info = info;
-      _isNewStudent = false;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _info = info;
+        _isNewStudent = false;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _linkTempRecord(StudentPaymentInfo chosen) async {
-    setState(() => _isLinking = true);
+    // Keep _isLinking = true for the entire operation so the UI
+    // never renders _buildPaymentView while _info is still null.
+    if (mounted) setState(() => _isLinking = true);
+
     await _db.linkTempToLrn(
       tempStudentId: chosen.student.id!,
       realLrn: widget.lrn,
       realName: widget.name,
       grade: chosen.student.grade,
     );
-    // Reload with the now-linked real LRN
-    await _loadOrCreateStudent();
-    setState(() => _isLinking = false);
+
+    // Reload — this will populate _info before we clear _isLinking.
+    final info = await _db.getStudentPaymentInfo(widget.lrn);
+    if (mounted) {
+      setState(() {
+        _info = info;
+        _isNewStudent = info == null;
+        _isLoading = false;
+        _isLinking = false;
+      });
+    }
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -176,7 +189,7 @@ class _ResultScreenState extends State<ResultScreen>
       setState(() => _isSavingPayment = false);
 
       if (mounted) {
-        final isNowPaid = _info!.isFullyPaid;
+        final isNowPaid = _info?.isFullyPaid ?? false;
         final txn = savedPayment.transactionNumber;
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -374,6 +387,15 @@ class _ResultScreenState extends State<ResultScreen>
   // ─── Payment view (existing student) ──────────────────────────────────────
 
   Widget _buildPaymentView() {
+    // ── NULL GUARD: _info can be null for a brief frame during async
+    //    reload (e.g. right after temp-linking). Show a spinner instead
+    //    of crashing on the null-check operator.
+    if (_info == null) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF16A34A)),
+      );
+    }
+
     final info = _info!;
 
     return SingleChildScrollView(
