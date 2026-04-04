@@ -77,6 +77,12 @@ class StudentCard extends StatelessWidget {
         ? (info.amountPaid / info.totalFee).clamp(0.0, 1.0)
         : 0.0;
 
+    // Collect the latest transaction number (last payment)
+    final latestTxn = info.payments.isNotEmpty &&
+            info.payments.last.transactionNumber.isNotEmpty
+        ? info.payments.last.transactionNumber
+        : null;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -159,6 +165,36 @@ class StudentCard extends StatelessWidget {
                     style: TextStyle(color: Colors.grey[400], fontSize: 10)),
               ],
             ),
+
+            // Latest transaction number badge
+            if (latestTxn != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                      color: const Color(0xFF3B82F6).withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.confirmation_number_rounded,
+                        size: 11, color: Color(0xFF3B82F6)),
+                    const SizedBox(width: 5),
+                    Text('Latest: $latestTxn',
+                        style: const TextStyle(
+                            color: Color(0xFF1D4ED8),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'monospace',
+                            letterSpacing: 0.4)),
+                  ],
+                ),
+              ),
+            ],
 
             const SizedBox(height: 10),
             Row(

@@ -4,6 +4,7 @@ class Payment {
   final double amount;
   final String note;
   final String createdAt;
+  final String transactionNumber;
 
   Payment({
     this.id,
@@ -11,6 +12,7 @@ class Payment {
     required this.amount,
     this.note = '',
     required this.createdAt,
+    this.transactionNumber = '',
   });
 
   Map<String, dynamic> toMap() => {
@@ -19,6 +21,7 @@ class Payment {
         'amount': amount,
         'note': note,
         'created_at': createdAt,
+        'transaction_number': transactionNumber,
       };
 
   factory Payment.fromMap(Map<String, dynamic> map) => Payment(
@@ -27,5 +30,6 @@ class Payment {
         amount: (map['amount'] as num).toDouble(),
         note: map['note'] as String? ?? '',
         createdAt: map['created_at'] as String,
+        transactionNumber: map['transaction_number'] as String? ?? '',
       );
 }

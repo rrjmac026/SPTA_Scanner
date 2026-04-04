@@ -22,7 +22,7 @@ class ExcelExportHelper {
     final headers = [
       '#', 'Full Name', 'LRN', 'Grade',
       'Total Fee', 'Amount Paid', 'Balance', 'Status',
-      'No. of Payments', 'Date Registered'
+      'No. of Payments', 'Last Transaction #', 'Date Registered'
     ];
     for (var i = 0; i < headers.length; i++) {
       final cell = sheet.cell(
@@ -40,7 +40,8 @@ class ExcelExportHelper {
     sheet.setColumnWidth(6, 12);
     sheet.setColumnWidth(7, 14);
     sheet.setColumnWidth(8, 14);
-    sheet.setColumnWidth(9, 22);
+    sheet.setColumnWidth(9, 24);
+    sheet.setColumnWidth(10, 22);
 
     for (var i = 0; i < infos.length; i++) {
       final info = infos[i];
@@ -53,6 +54,11 @@ class ExcelExportHelper {
             ? ExcelColor.fromHexString('#EFF6FF')
             : ExcelColor.fromHexString('#FFFFFF'),
       );
+
+      // Latest transaction number (last payment)
+      final latestTxn = info.payments.isNotEmpty
+          ? info.payments.last.transactionNumber
+          : '';
 
       void setCell(int col, CellValue value) {
         final cell = sheet.cell(
@@ -70,10 +76,63 @@ class ExcelExportHelper {
       setCell(6, DoubleCellValue(info.remainingBalance));
       setCell(7, TextCellValue(info.paymentStatus));
       setCell(8, IntCellValue(info.payments.length));
-      setCell(9, TextCellValue(_formatDate(s.createdAt)));
+      setCell(9, TextCellValue(latestTxn));
+      setCell(10, TextCellValue(_formatDate(s.createdAt)));
     }
 
-    // Summary row
+    // ── Detail sheet: one row per individual payment ──────────────────────
+    final detailSheet = excel['Payment Details'];
+    final detailHeaders = [
+      '#', 'Transaction #', 'Student Name', 'LRN', 'Grade',
+      'Amount', 'Note', 'Date'
+    ];
+    for (var i = 0; i < detailHeaders.length; i++) {
+      final cell = detailSheet.cell(
+          CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+      cell.value = TextCellValue(detailHeaders[i]);
+      cell.cellStyle = headerStyle;
+    }
+    detailSheet.setColumnWidth(0, 5);
+    detailSheet.setColumnWidth(1, 26);
+    detailSheet.setColumnWidth(2, 28);
+    detailSheet.setColumnWidth(3, 18);
+    detailSheet.setColumnWidth(4, 12);
+    detailSheet.setColumnWidth(5, 12);
+    detailSheet.setColumnWidth(6, 20);
+    detailSheet.setColumnWidth(7, 22);
+
+    int detailRow = 1;
+    int counter = 1;
+    for (final info in infos) {
+      for (final p in info.payments) {
+        final isEven = (detailRow - 1) % 2 == 0;
+        final rowStyle = CellStyle(
+          backgroundColorHex: isEven
+              ? ExcelColor.fromHexString('#EFF6FF')
+              : ExcelColor.fromHexString('#FFFFFF'),
+        );
+
+        void setD(int col, CellValue value) {
+          final cell = detailSheet.cell(
+              CellIndex.indexByColumnRow(
+                  columnIndex: col, rowIndex: detailRow));
+          cell.value = value;
+          cell.cellStyle = rowStyle;
+        }
+
+        setD(0, IntCellValue(counter++));
+        setD(1, TextCellValue(p.transactionNumber));
+        setD(2, TextCellValue(info.student.name));
+        setD(3, TextCellValue(info.student.lrn));
+        setD(4, TextCellValue(info.student.grade));
+        setD(5, DoubleCellValue(p.amount));
+        setD(6, TextCellValue(p.note));
+        setD(7, TextCellValue(_formatDate(p.createdAt)));
+        detailRow++;
+      }
+    }
+
+    // Summary row on main sheet
     final summaryRowIndex = infos.length + 1;
     final summaryStyle = CellStyle(
       bold: true,

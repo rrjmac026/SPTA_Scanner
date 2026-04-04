@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../helpers/database_helper.dart';
 import '../models/models.dart';
@@ -119,7 +120,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       studentId = id;
     }
 
-    await _db.addPayment(Payment(
+    final savedPayment = await _db.addPayment(Payment(
       studentId: studentId,
       amount: amount,
       note: 'Manual entry',
@@ -137,6 +138,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
         isNew: !_lrnExists,
         isFullyPaid: updatedInfo?.isFullyPaid ?? false,
         remaining: updatedInfo?.remainingBalance ?? 0,
+        transactionNumber: savedPayment.transactionNumber,
       );
     }
   }
@@ -158,152 +160,241 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     required bool isNew,
     required bool isFullyPaid,
     required double remaining,
+    required String transactionNumber,
   }) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isDismissible: false,
-      builder: (_) => Container(
-        margin: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-            color: Colors.white, borderRadius: BorderRadius.circular(24)),
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 68,
-              height: 68,
-              decoration: BoxDecoration(
-                color: isFullyPaid
-                    ? const Color(0xFFCCFBF1)
-                    : const Color(0xFFDCFCE7),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Icon(
-                isFullyPaid
-                    ? Icons.celebration_rounded
-                    : Icons.check_circle_rounded,
-                color: isFullyPaid
-                    ? const Color(0xFF0D9488)
-                    : const Color(0xFF16A34A),
-                size: 38,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              isFullyPaid ? 'Fully Paid! 🎉' : 'Payment Recorded!',
-              style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: isFullyPaid
-                      ? const Color(0xFF0D9488)
-                      : const Color(0xFF16A34A)),
-            ),
-            const SizedBox(height: 8),
-            Text(name,
-                style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF14532D))),
-            Text('LRN: $lrn',
-                style: TextStyle(color: Colors.grey[500], fontSize: 12)),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
+      // Allow the sheet to size itself taller than half-screen when needed
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final bottomPadding = MediaQuery.of(sheetContext).viewInsets.bottom +
+            MediaQuery.of(sheetContext).padding.bottom;
+        return Padding(
+          padding: EdgeInsets.only(bottom: bottomPadding),
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24)),
+            // SingleChildScrollView prevents overflow on small screens
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  _successStat('Amount Paid', '₱${amount.toStringAsFixed(2)}',
-                      const Color(0xFF16A34A)),
-                  Container(width: 1, height: 36, color: Colors.grey[200]),
-                  _successStat(
-                      'Balance',
-                      '₱${remaining.toStringAsFixed(2)}',
+                  // ── Icon ────────────────────────────────────────────────
+                  Container(
+                    width: 68,
+                    height: 68,
+                    decoration: BoxDecoration(
+                      color: isFullyPaid
+                          ? const Color(0xFFCCFBF1)
+                          : const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Icon(
                       isFullyPaid
-                          ? const Color(0xFF16A34A)
-                          : const Color(0xFFDC2626)),
-                  Container(width: 1, height: 36, color: Colors.grey[200]),
-                  _successStat('Status', isFullyPaid ? 'Paid ✓' : 'Partial',
-                      isFullyPaid
-                          ? const Color(0xFF16A34A)
-                          : const Color(0xFFF97316)),
+                          ? Icons.celebration_rounded
+                          : Icons.check_circle_rounded,
+                      color: isFullyPaid
+                          ? const Color(0xFF0D9488)
+                          : const Color(0xFF16A34A),
+                      size: 38,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── Title ───────────────────────────────────────────────
+                  Text(
+                    isFullyPaid ? 'Fully Paid! 🎉' : 'Payment Recorded!',
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: isFullyPaid
+                            ? const Color(0xFF0D9488)
+                            : const Color(0xFF16A34A)),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(name,
+                      style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF14532D))),
+                  Text('LRN: $lrn',
+                      style: TextStyle(
+                          color: Colors.grey[500], fontSize: 12)),
+
+                  // ── Transaction number ───────────────────────────────────
+                  const SizedBox(height: 12),
+                  GestureDetector(
+                    onTap: () {
+                      Clipboard.setData(
+                          ClipboardData(text: transactionNumber));
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('Copied: $transactionNumber'),
+                        duration: const Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: const Color(0xFF1D4ED8),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        margin: const EdgeInsets.all(16),
+                      ));
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: const Color(0xFF3B82F6)
+                                .withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.confirmation_number_rounded,
+                              size: 15, color: Color(0xFF3B82F6)),
+                          const SizedBox(width: 6),
+                          Text(transactionNumber,
+                              style: const TextStyle(
+                                  color: Color(0xFF1D4ED8),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  fontFamily: 'monospace',
+                                  letterSpacing: 0.5)),
+                          const SizedBox(width: 6),
+                          const Icon(Icons.copy_rounded,
+                              size: 13, color: Color(0xFF3B82F6)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text('Tap to copy transaction number',
+                      style:
+                          TextStyle(color: Colors.grey[400], fontSize: 10)),
+
+                  // ── Stats ────────────────────────────────────────────────
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _successStat(
+                            'Amount Paid',
+                            '₱${amount.toStringAsFixed(2)}',
+                            const Color(0xFF16A34A)),
+                        Container(
+                            width: 1,
+                            height: 36,
+                            color: Colors.grey[200]),
+                        _successStat(
+                            'Balance',
+                            '₱${remaining.toStringAsFixed(2)}',
+                            isFullyPaid
+                                ? const Color(0xFF16A34A)
+                                : const Color(0xFFDC2626)),
+                        Container(
+                            width: 1,
+                            height: 36,
+                            color: Colors.grey[200]),
+                        _successStat(
+                            'Status',
+                            isFullyPaid ? 'Paid ✓' : 'Partial',
+                            isFullyPaid
+                                ? const Color(0xFF16A34A)
+                                : const Color(0xFFF97316)),
+                      ],
+                    ),
+                  ),
+
+                  // ── New student badge ────────────────────────────────────
+                  if (isNew) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.person_add_rounded,
+                              color: Color(0xFF16A34A), size: 16),
+                          SizedBox(width: 6),
+                          Text('New student registered',
+                              style: TextStyle(
+                                  color: Color(0xFF16A34A),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // ── Buttons ──────────────────────────────────────────────
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.pop(context);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.grey[600],
+                            side: BorderSide(color: Colors.grey[300]!),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 13),
+                          ),
+                          child: const Text('Done',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _resetForm();
+                          },
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: const Text('Add Another',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF16A34A),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 13),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
-            if (isNew) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.person_add_rounded,
-                        color: Color(0xFF16A34A), size: 16),
-                    SizedBox(width: 6),
-                    Text('New student registered',
-                        style: TextStyle(
-                            color: Color(0xFF16A34A),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700)),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      Navigator.pop(context);
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.grey[600],
-                      side: BorderSide(color: Colors.grey[300]!),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                    ),
-                    child: const Text('Done',
-                        style: TextStyle(fontWeight: FontWeight.w600)),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _resetForm();
-                    },
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('Add Another',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF16A34A),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -312,9 +403,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       children: [
         Text(value,
             style: TextStyle(
-                color: color, fontSize: 14, fontWeight: FontWeight.w800)),
+                color: color,
+                fontSize: 14,
+                fontWeight: FontWeight.w800)),
         const SizedBox(height: 2),
-        Text(label, style: TextStyle(color: Colors.grey[500], fontSize: 10)),
+        Text(label,
+            style: TextStyle(color: Colors.grey[500], fontSize: 10)),
       ],
     );
   }
@@ -360,7 +454,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                    color: iconBg, borderRadius: BorderRadius.circular(11)),
+                    color: iconBg,
+                    borderRadius: BorderRadius.circular(11)),
                 child: Icon(icon, color: iconColor, size: 20),
               ),
               const SizedBox(width: 10),
@@ -397,7 +492,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Add Transaction',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+                style:
+                    TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
             Text('Manual student entry',
                 style: TextStyle(fontSize: 11, color: Colors.white60)),
           ],
@@ -412,7 +508,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Info banner
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -498,7 +593,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2.5, color: Colors.white))
+                                strokeWidth: 2.5,
+                                color: Colors.white))
                         : const Icon(Icons.add_card_rounded, size: 22),
                     label: Text(
                       _isSaving

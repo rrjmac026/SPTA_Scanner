@@ -21,7 +21,7 @@ class DatabaseHelper {
     final path = join(dir.path, 'spta_payments.db');
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -44,6 +44,7 @@ class DatabaseHelper {
         amount REAL NOT NULL,
         note TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
+        transaction_number TEXT NOT NULL DEFAULT '',
         FOREIGN KEY (student_id) REFERENCES students(id)
       )
     ''');
@@ -54,6 +55,8 @@ class DatabaseHelper {
       )
     ''');
     await db.insert('settings', {'key': 'total_fee', 'value': '750'});
+    // Seed the transaction counter at 0
+    await db.insert('settings', {'key': 'txn_counter', 'value': '0'});
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -65,6 +68,7 @@ class DatabaseHelper {
           amount REAL NOT NULL,
           note TEXT NOT NULL DEFAULT '',
           created_at TEXT NOT NULL,
+          transaction_number TEXT NOT NULL DEFAULT '',
           FOREIGN KEY (student_id) REFERENCES students(id)
         )
       ''');
@@ -86,6 +90,7 @@ class DatabaseHelper {
               'amount': amt,
               'note': 'Migrated payment',
               'created_at': row['created_at'] as String,
+              'transaction_number': '',
             });
           }
         }
@@ -95,7 +100,68 @@ class DatabaseHelper {
         {'key': 'total_fee', 'value': '750'},
         conflictAlgorithm: ConflictAlgorithm.ignore,
       );
+      await db.insert(
+        'settings',
+        {'key': 'txn_counter', 'value': '0'},
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
     }
+
+    if (oldVersion < 4) {
+      // Add transaction_number column if upgrading from v3
+      try {
+        await db.execute(
+            'ALTER TABLE payments ADD COLUMN transaction_number TEXT NOT NULL DEFAULT \'\'');
+      } catch (_) {
+        // Column may already exist if onCreate ran with v4
+      }
+      await db.insert(
+        'settings',
+        {'key': 'txn_counter', 'value': '0'},
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+      // Back-fill existing rows with sequential transaction numbers
+      final rows = await db.query('payments', orderBy: 'id ASC');
+      for (final row in rows) {
+        final id = row['id'] as int;
+        final existing = row['transaction_number'] as String? ?? '';
+        if (existing.isEmpty) {
+          final txn = await _nextTransactionNumber(db);
+          await db.update(
+            'payments',
+            {'transaction_number': txn},
+            where: 'id = ?',
+            whereArgs: [id],
+          );
+        }
+      }
+    }
+  }
+
+  // ─── Transaction number generator ─────────────────────────────────────────
+
+  /// Atomically increments the counter and returns a formatted txn number.
+  /// Format: TXN-YYYYMMDD-00001
+  Future<String> _nextTransactionNumber(DatabaseExecutor db) async {
+    final rows = await db.query('settings',
+        where: 'key = ?', whereArgs: ['txn_counter']);
+    final current =
+        int.tryParse(rows.isEmpty ? '0' : rows.first['value'] as String) ?? 0;
+    final next = current + 1;
+    await db.insert(
+      'settings',
+      {'key': 'txn_counter', 'value': next.toString()},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    final now = DateTime.now();
+    final dateStr =
+        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+    return 'TXN-$dateStr-${next.toString().padLeft(5, '0')}';
+  }
+
+  Future<String> generateTransactionNumber() async {
+    final db = await database;
+    return _nextTransactionNumber(db);
   }
 
   // ─── Settings ──────────────────────────────────────────────────────────────
@@ -153,13 +219,25 @@ class DatabaseHelper {
 
   Future<Payment> addPayment(Payment payment) async {
     final db = await database;
-    final id = await db.insert('payments', payment.toMap());
-    return Payment(
-      id: id,
+    // Auto-generate transaction number if not supplied
+    final txn = payment.transactionNumber.isNotEmpty
+        ? payment.transactionNumber
+        : await _nextTransactionNumber(db);
+    final withTxn = Payment(
       studentId: payment.studentId,
       amount: payment.amount,
       note: payment.note,
       createdAt: payment.createdAt,
+      transactionNumber: txn,
+    );
+    final id = await db.insert('payments', withTxn.toMap());
+    return Payment(
+      id: id,
+      studentId: withTxn.studentId,
+      amount: withTxn.amount,
+      note: withTxn.note,
+      createdAt: withTxn.createdAt,
+      transactionNumber: withTxn.transactionNumber,
     );
   }
 

@@ -29,6 +29,7 @@ class PdfExportHelper {
     const greenColor = PdfColor.fromInt(0xFF16A34A);
     const redColor = PdfColor.fromInt(0xFFDC2626);
 
+    // ── Page 1: Summary + Student table ───────────────────────────────────
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
@@ -70,6 +71,60 @@ class PdfExportHelper {
         ],
       ),
     );
+
+    // ── Page 2: Individual transaction detail ──────────────────────────────
+    // Flatten all payments across students
+    final allPayments = <Map<String, String>>[];
+    for (final info in infos) {
+      for (final p in info.payments) {
+        allPayments.add({
+          'txn': p.transactionNumber.isNotEmpty ? p.transactionNumber : '—',
+          'name': info.student.name,
+          'lrn': info.student.lrn,
+          'grade': info.student.grade,
+          'amount': '₱${p.amount.toStringAsFixed(2)}',
+          'date': _formatDate(p.createdAt),
+          'note': p.note.isNotEmpty ? p.note : '—',
+        });
+      }
+    }
+
+    if (allPayments.isNotEmpty) {
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(30),
+          footer: (context) => pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('SPTA Transaction Details',
+                  style:
+                      pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+              pw.Text('Page ${context.pageNumber} of ${context.pagesCount}',
+                  style:
+                      pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+            ],
+          ),
+          build: (context) => [
+            pw.Container(
+              width: double.infinity,
+              padding: const pw.EdgeInsets.all(12),
+              decoration: pw.BoxDecoration(
+                  color: primaryColor,
+                  borderRadius: pw.BorderRadius.circular(8)),
+              child: pw.Text('Transaction Details — All Payments',
+                  style: pw.TextStyle(
+                      fontSize: 14,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.white)),
+            ),
+            pw.SizedBox(height: 12),
+            _buildTransactionTable(
+                allPayments, primaryColor, lightBlue, greenColor),
+          ],
+        ),
+      );
+    }
 
     final dir = await getApplicationDocumentsDirectory();
     final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
@@ -246,6 +301,54 @@ class PdfExportHelper {
     );
   }
 
+  static pw.Widget _buildTransactionTable(
+    List<Map<String, String>> payments,
+    PdfColor primaryColor,
+    PdfColor lightBlue,
+    PdfColor greenColor,
+  ) {
+    return pw.Table(
+      columnWidths: {
+        0: const pw.FixedColumnWidth(20),
+        1: const pw.FlexColumnWidth(2.8),
+        2: const pw.FlexColumnWidth(2.5),
+        3: const pw.FlexColumnWidth(1.8),
+        4: const pw.FixedColumnWidth(30),
+        5: const pw.FixedColumnWidth(46),
+        6: const pw.FlexColumnWidth(2),
+      },
+      border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+      children: [
+        pw.TableRow(
+          decoration: pw.BoxDecoration(color: primaryColor),
+          children: ['#', 'Transaction #', 'Student Name', 'LRN',
+              'Grade', 'Amount', 'Date']
+              .map((h) => _headerCell(h))
+              .toList(),
+        ),
+        ...payments.asMap().entries.map((entry) {
+          final i = entry.key;
+          final p = entry.value;
+          final isEven = i % 2 == 0;
+          return pw.TableRow(
+            decoration: pw.BoxDecoration(
+                color: isEven ? lightBlue : PdfColors.white),
+            children: [
+              _dataCell('${i + 1}'),
+              _dataCell(p['txn']!,
+                  color: const PdfColor.fromInt(0xFF1D4ED8)),
+              _dataCell(p['name']!),
+              _dataCell(p['lrn']!),
+              _dataCell(p['grade']!),
+              _dataCell(p['amount']!, color: greenColor),
+              _dataCell(p['date']!),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
   static pw.Widget _headerCell(String text) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 5),
@@ -263,5 +366,13 @@ class PdfExportHelper {
       child: pw.Text(text,
           style: pw.TextStyle(fontSize: 7.5, color: color), maxLines: 2),
     );
+  }
+
+  static String _formatDate(String dateStr) {
+    try {
+      return DateFormat('MMM d, yyyy h:mm a').format(DateTime.parse(dateStr));
+    } catch (_) {
+      return dateStr;
+    }
   }
 }

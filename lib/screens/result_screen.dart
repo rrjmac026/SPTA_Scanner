@@ -103,36 +103,73 @@ class _ResultScreenState extends State<ResultScreen>
       if (amt == null) return;
       setState(() => _isSavingPayment = true);
       final now = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
-      await _db.addPayment(Payment(
+
+      // addPayment returns the saved payment with the generated transaction number
+      final savedPayment = await _db.addPayment(Payment(
         studentId: _info!.student.id!,
         amount: amt as double,
         createdAt: now,
       ));
+
       await _loadOrCreateStudent();
       setState(() => _isSavingPayment = false);
+
       if (mounted) {
         final isNowPaid = _info!.isFullyPaid;
+        final txn = savedPayment.transactionNumber;
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  isNowPaid
-                      ? Icons.celebration_rounded
-                      : Icons.check_circle_rounded,
-                  color: Colors.white,
-                  size: 20,
+                Row(
+                  children: [
+                    Icon(
+                      isNowPaid
+                          ? Icons.celebration_rounded
+                          : Icons.check_circle_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        isNowPaid
+                            ? 'Payment complete! SPTA fully paid!'
+                            : '₱${amt.toStringAsFixed(2)} recorded successfully!',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 14),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    isNowPaid
-                        ? 'Payment complete! SPTA fully paid!'
-                        : '₱${amt.toStringAsFixed(2)} recorded successfully!',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 14),
+                if (txn.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: txn));
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.confirmation_number_rounded,
+                            size: 13, color: Colors.white70),
+                        const SizedBox(width: 5),
+                        Text(txn,
+                            style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                                fontFamily: 'monospace',
+                                letterSpacing: 0.5)),
+                        const SizedBox(width: 5),
+                        const Icon(Icons.copy_rounded,
+                            size: 11, color: Colors.white54),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
             backgroundColor: isNowPaid
@@ -142,7 +179,7 @@ class _ResultScreenState extends State<ResultScreen>
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             margin: const EdgeInsets.all(16),
-            duration: const Duration(seconds: 3),
+            duration: const Duration(seconds: 4),
           ),
         );
       }
