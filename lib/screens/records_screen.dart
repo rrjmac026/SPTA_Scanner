@@ -26,7 +26,6 @@ class _RecordsScreenState extends State<RecordsScreen> {
     'All', 'Grade 7', 'Grade 8', 'Grade 9',
     'Grade 10', 'Grade 11', 'Grade 12',
   ];
-
   final List<String> _statusFilters = ['All', 'Fully Paid', 'Partial', 'Unpaid'];
 
   @override
@@ -120,7 +119,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
                 style: const TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF1A3A6B))),
+                    color: Color(0xFF14532D))),
             const SizedBox(height: 6),
             Text(file.path.split('/').last,
                 style: TextStyle(color: Colors.grey[500], fontSize: 12),
@@ -137,8 +136,8 @@ class _RecordsScreenState extends State<RecordsScreen> {
                     icon: const Icon(Icons.open_in_new_rounded, size: 18),
                     label: const Text('Open'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF2563EB),
-                      side: const BorderSide(color: Color(0xFF2563EB)),
+                      foregroundColor: const Color(0xFF16A34A),
+                      side: const BorderSide(color: Color(0xFF16A34A)),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -156,7 +155,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
                     icon: const Icon(Icons.share_rounded, size: 18),
                     label: const Text('Share'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2563EB),
+                      backgroundColor: const Color(0xFF16A34A),
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -201,7 +200,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
                 style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF1A3A6B))),
+                    color: Color(0xFF14532D))),
             const SizedBox(height: 4),
             Text('Exporting $count records',
                 style: TextStyle(color: Colors.grey[500], fontSize: 13)),
@@ -278,8 +277,6 @@ class _RecordsScreenState extends State<RecordsScreen> {
     );
   }
 
-  // ─── Status chip ──────────────────────────────────────────────────────────
-
   Widget _statusChip(String status) {
     late Color bg, text;
     late IconData icon;
@@ -319,15 +316,13 @@ class _RecordsScreenState extends State<RecordsScreen> {
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
-    final totalCollected =
-        filtered.fold<double>(0, (s, i) => s + i.amountPaid);
-    final fullyPaidCount =
-        filtered.where((i) => i.isFullyPaid).length;
+    final totalCollected = filtered.fold<double>(0, (s, i) => s + i.amountPaid);
+    final fullyPaidCount = filtered.where((i) => i.isFullyPaid).length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4FF),
+      backgroundColor: const Color(0xFFF0FDF4),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A3A6B),
+        backgroundColor: const Color(0xFF14532D),
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -368,7 +363,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
         children: [
           // Search + filter bar
           Container(
-            color: const Color(0xFF1A3A6B),
+            color: const Color(0xFF14532D),
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: Column(
               children: [
@@ -391,7 +386,6 @@ class _RecordsScreenState extends State<RecordsScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                // Grade filter
                 SizedBox(
                   height: 30,
                   child: ListView.separated(
@@ -400,12 +394,10 @@ class _RecordsScreenState extends State<RecordsScreen> {
                     separatorBuilder: (_, __) => const SizedBox(width: 6),
                     itemBuilder: (_, i) => _filterChip(
                         _gradeFilters[i], _selectedGradeFilter,
-                        () => setState(
-                            () => _selectedGradeFilter = _gradeFilters[i])),
+                        () => setState(() => _selectedGradeFilter = _gradeFilters[i])),
                   ),
                 ),
                 const SizedBox(height: 6),
-                // Status filter
                 SizedBox(
                   height: 30,
                   child: ListView.separated(
@@ -414,8 +406,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
                     separatorBuilder: (_, __) => const SizedBox(width: 6),
                     itemBuilder: (_, i) => _filterChip(
                         _statusFilters[i], _selectedStatusFilter,
-                        () => setState(
-                            () => _selectedStatusFilter = _statusFilters[i])),
+                        () => setState(() => _selectedStatusFilter = _statusFilters[i])),
                   ),
                 ),
               ],
@@ -426,17 +417,16 @@ class _RecordsScreenState extends State<RecordsScreen> {
           if (!_isLoading && _infos.isNotEmpty)
             Container(
               color: Colors.white,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Row(
                 children: [
                   _statItem('${filtered.length}', 'Students',
-                      Icons.people_alt_rounded, const Color(0xFF2563EB)),
+                      Icons.people_alt_rounded, const Color(0xFF16A34A)),
                   const SizedBox(width: 8),
                   Container(width: 1, height: 28, color: Colors.grey[200]),
                   const SizedBox(width: 8),
                   _statItem('$fullyPaidCount', 'Fully Paid',
-                      Icons.verified_rounded, const Color(0xFF16A34A)),
+                      Icons.verified_rounded, const Color(0xFF14532D)),
                   const SizedBox(width: 8),
                   Container(width: 1, height: 28, color: Colors.grey[200]),
                   const SizedBox(width: 8),
@@ -444,17 +434,15 @@ class _RecordsScreenState extends State<RecordsScreen> {
                       '₱${totalCollected.toStringAsFixed(0)}',
                       'Collected',
                       Icons.payments_rounded,
-                      const Color(0xFF7C3AED)),
+                      const Color(0xFF0D9488)),
                 ],
               ),
             ),
 
-          // List
           Expanded(
             child: _isLoading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                        color: Color(0xFF2563EB)))
+                    child: CircularProgressIndicator(color: Color(0xFF16A34A)))
                 : filtered.isEmpty
                     ? Center(
                         child: Column(
@@ -491,8 +479,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
                           final info = filtered[i];
                           final s = info.student;
                           final pct = info.totalFee > 0
-                              ? (info.amountPaid / info.totalFee)
-                                  .clamp(0.0, 1.0)
+                              ? (info.amountPaid / info.totalFee).clamp(0.0, 1.0)
                               : 0.0;
 
                           return Container(
@@ -513,20 +500,19 @@ class _RecordsScreenState extends State<RecordsScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Top row: index, name, status chip
                                   Row(
                                     children: [
                                       Container(
                                         width: 36,
                                         height: 36,
                                         decoration: BoxDecoration(
-                                            color: const Color(0xFFEFF6FF),
+                                            color: const Color(0xFFF0FDF4),
                                             borderRadius:
                                                 BorderRadius.circular(10)),
                                         child: Center(
                                           child: Text('${i + 1}',
                                               style: const TextStyle(
-                                                  color: Color(0xFF2563EB),
+                                                  color: Color(0xFF16A34A),
                                                   fontWeight: FontWeight.w800,
                                                   fontSize: 13)),
                                         ),
@@ -539,7 +525,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
                                           children: [
                                             Text(s.name,
                                                 style: const TextStyle(
-                                                    color: Color(0xFF1A3A6B),
+                                                    color: Color(0xFF14532D),
                                                     fontWeight: FontWeight.w700,
                                                     fontSize: 14)),
                                             const SizedBox(height: 1),
@@ -559,7 +545,6 @@ class _RecordsScreenState extends State<RecordsScreen> {
                                   const Divider(height: 1),
                                   const SizedBox(height: 10),
 
-                                  // Grade + date row
                                   Row(
                                     children: [
                                       if (s.grade.isNotEmpty) ...[
@@ -567,15 +552,14 @@ class _RecordsScreenState extends State<RecordsScreen> {
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 8, vertical: 3),
                                           decoration: BoxDecoration(
-                                              color: const Color(0xFFEFF6FF),
+                                              color: const Color(0xFFF0FDF4),
                                               borderRadius:
                                                   BorderRadius.circular(8)),
                                           child: Text(s.grade,
                                               style: const TextStyle(
-                                                  color: Color(0xFF2563EB),
+                                                  color: Color(0xFF16A34A),
                                                   fontSize: 11,
-                                                  fontWeight:
-                                                      FontWeight.w700)),
+                                                  fontWeight: FontWeight.w700)),
                                         ),
                                         const SizedBox(width: 8),
                                       ],
@@ -590,7 +574,6 @@ class _RecordsScreenState extends State<RecordsScreen> {
 
                                   const SizedBox(height: 10),
 
-                                  // Payment amounts row
                                   Row(
                                     children: [
                                       Expanded(
@@ -615,19 +598,16 @@ class _RecordsScreenState extends State<RecordsScreen> {
 
                                   const SizedBox(height: 8),
 
-                                  // Progress bar
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(4),
                                     child: LinearProgressIndicator(
                                       value: pct,
                                       minHeight: 6,
-                                      backgroundColor:
-                                          const Color(0xFFE2E8F0),
-                                      valueColor:
-                                          AlwaysStoppedAnimation<Color>(
+                                      backgroundColor: const Color(0xFFE2E8F0),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
                                         info.isFullyPaid
                                             ? const Color(0xFF16A34A)
-                                            : const Color(0xFF2563EB),
+                                            : const Color(0xFF4ADE80),
                                       ),
                                     ),
                                   ),
@@ -654,7 +634,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
           ? null
           : FloatingActionButton.extended(
               onPressed: _isExporting ? null : _showExportOptions,
-              backgroundColor: const Color(0xFF2563EB),
+              backgroundColor: const Color(0xFF16A34A),
               foregroundColor: Colors.white,
               icon: _isExporting
                   ? const SizedBox(
@@ -679,21 +659,18 @@ class _RecordsScreenState extends State<RecordsScreen> {
           color: isSelected ? Colors.white : Colors.white.withOpacity(0.15),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-              color: isSelected
-                  ? Colors.white
-                  : Colors.white.withOpacity(0.3)),
+              color: isSelected ? Colors.white : Colors.white.withOpacity(0.3)),
         ),
         child: Text(label,
             style: TextStyle(
-                color: isSelected ? const Color(0xFF1A3A6B) : Colors.white,
+                color: isSelected ? const Color(0xFF14532D) : Colors.white,
                 fontSize: 11,
                 fontWeight: FontWeight.w600)),
       ),
     );
   }
 
-  Widget _statItem(
-      String value, String label, IconData icon, Color color) {
+  Widget _statItem(String value, String label, IconData icon, Color color) {
     return Row(
       children: [
         Icon(icon, size: 14, color: color),
@@ -703,9 +680,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
           children: [
             Text(value,
                 style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: color)),
+                    fontSize: 12, fontWeight: FontWeight.w800, color: color)),
             Text(label,
                 style: TextStyle(fontSize: 9, color: Colors.grey[500])),
           ],

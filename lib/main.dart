@@ -21,14 +21,14 @@ class SPTAApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2563EB),
+          seedColor: const Color(0xFF16A34A),
           brightness: Brightness.light,
         ),
         useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFF0F4FF),
+        scaffoldBackgroundColor: const Color(0xFFF0FDF4),
         appBarTheme: const AppBarTheme(
           systemOverlayStyle: SystemUiOverlayStyle(
-            statusBarColor: Color(0xFF1A3A6B),
+            statusBarColor: Color(0xFF14532D),
             statusBarIconBrightness: Brightness.light,
           ),
         ),

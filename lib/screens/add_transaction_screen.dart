@@ -98,7 +98,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     int studentId;
 
     if (_lrnExists && _existingInfo != null) {
-      // Existing student — just add payment
       final remaining = _existingInfo!.remainingBalance;
       if (amount > remaining) {
         setState(() => _isSaving = false);
@@ -108,7 +107,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       }
       studentId = _existingInfo!.student.id!;
     } else {
-      // New student — register first
       final student = Student(
         name: name,
         lrn: lrn,
@@ -131,9 +129,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       createdAt: now,
     ));
 
-    // Reload to get updated info
     final updatedInfo = await _db.getStudentPaymentInfo(lrn);
-
     setState(() => _isSaving = false);
 
     if (mounted) {
@@ -183,7 +179,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
               height: 68,
               decoration: BoxDecoration(
                 color: isFullyPaid
-                    ? const Color(0xFFEDE9FE)
+                    ? const Color(0xFFCCFBF1)
                     : const Color(0xFFDCFCE7),
                 borderRadius: BorderRadius.circular(20),
               ),
@@ -192,7 +188,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                     ? Icons.celebration_rounded
                     : Icons.check_circle_rounded,
                 color: isFullyPaid
-                    ? const Color(0xFF7C3AED)
+                    ? const Color(0xFF0D9488)
                     : const Color(0xFF16A34A),
                 size: 38,
               ),
@@ -204,20 +200,17 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                   color: isFullyPaid
-                      ? const Color(0xFF7C3AED)
+                      ? const Color(0xFF0D9488)
                       : const Color(0xFF16A34A)),
             ),
             const SizedBox(height: 8),
-            Text(
-              name,
-              style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1A3A6B)),
-            ),
+            Text(name,
+                style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF14532D))),
             Text('LRN: $lrn',
-                style:
-                    TextStyle(color: Colors.grey[500], fontSize: 12)),
+                style: TextStyle(color: Colors.grey[500], fontSize: 12)),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(16),
@@ -230,16 +223,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                 children: [
                   _successStat('Amount Paid',
                       '₱${amount.toStringAsFixed(2)}', const Color(0xFF16A34A)),
-                  Container(
-                      width: 1, height: 36, color: Colors.grey[200]),
+                  Container(width: 1, height: 36, color: Colors.grey[200]),
                   _successStat(
                       'Balance',
                       '₱${remaining.toStringAsFixed(2)}',
                       isFullyPaid
                           ? const Color(0xFF16A34A)
                           : const Color(0xFFDC2626)),
-                  Container(
-                      width: 1, height: 36, color: Colors.grey[200]),
+                  Container(width: 1, height: 36, color: Colors.grey[200]),
                   _successStat('Status',
                       isFullyPaid ? 'Paid ✓' : 'Partial',
                       isFullyPaid
@@ -254,18 +245,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
+                  color: const Color(0xFFF0FDF4),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.person_add_rounded,
-                        color: Color(0xFF2563EB), size: 16),
+                        color: Color(0xFF16A34A), size: 16),
                     SizedBox(width: 6),
                     Text('New student registered',
                         style: TextStyle(
-                            color: Color(0xFF2563EB),
+                            color: Color(0xFF16A34A),
                             fontSize: 12,
                             fontWeight: FontWeight.w700)),
                   ],
@@ -303,7 +294,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                     label: const Text('Add Another',
                         style: TextStyle(fontWeight: FontWeight.w700)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2563EB),
+                      backgroundColor: const Color(0xFF16A34A),
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -325,9 +316,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       children: [
         Text(value,
             style: TextStyle(
-                color: color,
-                fontSize: 14,
-                fontWeight: FontWeight.w800)),
+                color: color, fontSize: 14, fontWeight: FontWeight.w800)),
         const SizedBox(height: 2),
         Text(label,
             style: TextStyle(color: Colors.grey[500], fontSize: 10)),
@@ -354,9 +343,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     final amountPaid = _existingInfo?.amountPaid ?? 0;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4FF),
+      backgroundColor: const Color(0xFFF0FDF4),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A3A6B),
+        backgroundColor: const Color(0xFF14532D),
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -386,21 +375,21 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
+                    color: const Color(0xFFF0FDF4),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                        color: const Color(0xFF2563EB).withOpacity(0.25)),
+                        color: const Color(0xFF16A34A).withOpacity(0.3)),
                   ),
                   child: const Row(
                     children: [
                       Icon(Icons.info_outline_rounded,
-                          color: Color(0xFF2563EB), size: 20),
+                          color: Color(0xFF16A34A), size: 20),
                       SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           'Use this form to manually record a student\'s payment when their QR code is unavailable.',
                           style: TextStyle(
-                              color: Color(0xFF1E40AF),
+                              color: Color(0xFF166534),
                               fontSize: 12,
                               height: 1.4),
                         ),
@@ -410,15 +399,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                 ),
                 const SizedBox(height: 20),
 
-                // ─── Student Info Card ──────────────────────────────────────
                 _sectionCard(
                   icon: Icons.person_rounded,
-                  iconColor: const Color(0xFF2563EB),
-                  iconBg: const Color(0xFFEFF6FF),
+                  iconColor: const Color(0xFF16A34A),
+                  iconBg: const Color(0xFFF0FDF4),
                   title: 'Student Information',
                   child: Column(
                     children: [
-                      // LRN field (check first)
                       _fieldLabel('Learner Reference Number (LRN)'),
                       const SizedBox(height: 8),
                       TextFormField(
@@ -454,14 +441,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                                       : Icons.person_add_rounded,
                                   color: _lrnExists
                                       ? const Color(0xFF16A34A)
-                                      : const Color(0xFF2563EB),
+                                      : const Color(0xFF0D9488),
                                   size: 20,
                                 )
                               : null,
                         ),
                       ),
 
-                      // Existing student notice
                       if (_lrnChecked && _lrnExists && _existingInfo != null) ...[
                         const SizedBox(height: 10),
                         Container(
@@ -507,20 +493,20 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEFF6FF),
+                            color: const Color(0xFFF0FDF4),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                                color: const Color(0xFF2563EB).withOpacity(0.3)),
+                                color: const Color(0xFF16A34A).withOpacity(0.3)),
                           ),
                           child: const Row(
                             children: [
                               Icon(Icons.person_add_rounded,
-                                  color: Color(0xFF2563EB), size: 18),
+                                  color: Color(0xFF16A34A), size: 18),
                               SizedBox(width: 8),
                               Text(
                                 'New student — will be registered',
                                 style: TextStyle(
-                                    color: Color(0xFF1E40AF),
+                                    color: Color(0xFF166534),
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600),
                               ),
@@ -531,7 +517,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
 
                       const SizedBox(height: 16),
 
-                      // Full Name
                       _fieldLabel('Full Name'),
                       const SizedBox(height: 8),
                       TextFormField(
@@ -557,7 +542,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
 
                       const SizedBox(height: 16),
 
-                      // Grade Level
                       _fieldLabel('Grade Level'),
                       const SizedBox(height: 8),
                       IgnorePointer(
@@ -582,7 +566,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                                 borderRadius: BorderRadius.circular(12),
                                 icon: const Icon(
                                     Icons.keyboard_arrow_down_rounded,
-                                    color: Color(0xFF2563EB)),
+                                    color: Color(0xFF16A34A)),
                                 items: _grades.map((grade) {
                                   return DropdownMenuItem(
                                     value: grade,
@@ -592,14 +576,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                                           width: 26,
                                           height: 26,
                                           decoration: BoxDecoration(
-                                              color: const Color(0xFFEFF6FF),
+                                              color: const Color(0xFFF0FDF4),
                                               borderRadius:
                                                   BorderRadius.circular(7)),
                                           child: Center(
                                             child: Text(
                                                 grade.split(' ').last,
                                                 style: const TextStyle(
-                                                    color: Color(0xFF2563EB),
+                                                    color: Color(0xFF16A34A),
                                                     fontSize: 10,
                                                     fontWeight:
                                                         FontWeight.w800)),
@@ -609,16 +593,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                                         Text(grade,
                                             style: const TextStyle(
                                                 fontSize: 14,
-                                                fontWeight:
-                                                    FontWeight.w500)),
+                                                fontWeight: FontWeight.w500)),
                                       ],
                                     ),
                                   );
                                 }).toList(),
                                 onChanged: _lrnExists
                                     ? null
-                                    : (v) => setState(
-                                        () => _selectedGrade = v!),
+                                    : (v) => setState(() => _selectedGrade = v!),
                               ),
                             ),
                           ),
@@ -630,15 +612,13 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
 
                 const SizedBox(height: 16),
 
-                // ─── Payment Card ────────────────────────────────────────────
                 _sectionCard(
                   icon: Icons.payments_rounded,
-                  iconColor: const Color(0xFF16A34A),
-                  iconBg: const Color(0xFFDCFCE7),
+                  iconColor: const Color(0xFF0D9488),
+                  iconBg: const Color(0xFFCCFBF1),
                   title: 'Payment Details',
                   child: Column(
                     children: [
-                      // Fee breakdown
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
@@ -651,7 +631,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                               child: _feeRow(
                                 'Total Fee',
                                 '₱${_totalFee.toStringAsFixed(2)}',
-                                const Color(0xFF1A3A6B),
+                                const Color(0xFF14532D),
                               ),
                             ),
                             if (_lrnExists) ...[
@@ -737,26 +717,22 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                               width: 38,
                               child: const Text('₱',
                                   style: TextStyle(
-                                      color: Color(0xFF2563EB),
+                                      color: Color(0xFF16A34A),
                                       fontSize: 18,
                                       fontWeight: FontWeight.w700)),
                             ),
                           ),
                         ),
 
-                        // Quick fill chips
                         const SizedBox(height: 12),
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
                           children: [
                             _quickChip('Full', remaining),
-                            if (remaining >= 500)
-                              _quickChip('₱500', 500),
-                            if (remaining >= 250)
-                              _quickChip('₱250', 250),
-                            if (remaining >= 100)
-                              _quickChip('₱100', 100),
+                            if (remaining >= 500) _quickChip('₱500', 500),
+                            if (remaining >= 250) _quickChip('₱250', 250),
+                            if (remaining >= 100) _quickChip('₱100', 100),
                           ],
                         ),
                       ],
@@ -766,7 +742,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
 
                 const SizedBox(height: 24),
 
-                // Submit button
                 SizedBox(
                   height: 56,
                   child: ElevatedButton.icon(
@@ -779,8 +754,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white))
+                                strokeWidth: 2.5, color: Colors.white))
                         : const Icon(Icons.add_card_rounded, size: 22),
                     label: Text(
                       _isSaving
@@ -859,7 +833,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
               const SizedBox(width: 10),
               Text(title,
                   style: const TextStyle(
-                      color: Color(0xFF1A3A6B),
+                      color: Color(0xFF14532D),
                       fontSize: 15,
                       fontWeight: FontWeight.w700)),
             ],
@@ -917,7 +891,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF2563EB), width: 2),
+        borderSide: const BorderSide(color: Color(0xFF16A34A), width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -932,20 +906,18 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
 
   Widget _quickChip(String label, double amount) {
     return GestureDetector(
-      onTap: () =>
-          _amountController.text = amount.toStringAsFixed(2),
+      onTap: () => _amountController.text = amount.toStringAsFixed(2),
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: const Color(0xFFEFF6FF),
+          color: const Color(0xFFF0FDF4),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-              color: const Color(0xFF2563EB).withOpacity(0.3)),
+              color: const Color(0xFF16A34A).withOpacity(0.3)),
         ),
         child: Text(label,
             style: const TextStyle(
-                color: Color(0xFF2563EB),
+                color: Color(0xFF16A34A),
                 fontSize: 12,
                 fontWeight: FontWeight.w700)),
       ),
@@ -957,13 +929,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       children: [
         Text(value,
             style: TextStyle(
-                color: color,
-                fontSize: 13,
-                fontWeight: FontWeight.w800)),
+                color: color, fontSize: 13, fontWeight: FontWeight.w800)),
         const SizedBox(height: 2),
         Text(label,
-            style:
-                TextStyle(color: Colors.grey[500], fontSize: 10)),
+            style: TextStyle(color: Colors.grey[500], fontSize: 10)),
       ],
     );
   }

@@ -70,9 +70,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4FF),
+      backgroundColor: const Color(0xFFF0FDF4),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A3A6B),
+        backgroundColor: const Color(0xFF14532D),
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -95,7 +95,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF1A3A6B), Color(0xFF2563EB)],
+                    colors: [Color(0xFF14532D), Color(0xFF16A34A)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -142,7 +142,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
               const SizedBox(height: 24),
 
-              // Update fee card
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -165,16 +164,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           width: 36,
                           height: 36,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEFF6FF),
+                            color: const Color(0xFFF0FDF4),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(Icons.edit_rounded,
-                              color: Color(0xFF2563EB), size: 18),
+                              color: Color(0xFF16A34A), size: 18),
                         ),
                         const SizedBox(width: 10),
                         const Text('Update Total Fee',
                             style: TextStyle(
-                                color: Color(0xFF1A3A6B),
+                                color: Color(0xFF14532D),
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700)),
                       ],
@@ -219,7 +218,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           alignment: Alignment.center,
                           child: const Text('₱',
                               style: TextStyle(
-                                  color: Color(0xFF2563EB),
+                                  color: Color(0xFF16A34A),
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700)),
                         ),
@@ -240,7 +239,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: const BorderSide(
-                              color: Color(0xFF2563EB), width: 2),
+                              color: Color(0xFF16A34A), width: 2),
                         ),
                         errorBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -269,7 +268,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               fontSize: 15, fontWeight: FontWeight.w700),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
+                          backgroundColor: const Color(0xFF16A34A),
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -283,13 +282,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
               const SizedBox(height: 16),
 
-              // Info card
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFEF3C7),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4)),
+                  border: Border.all(
+                      color: const Color(0xFFF59E0B).withOpacity(0.4)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,

@@ -61,7 +61,7 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4FF),
+      backgroundColor: const Color(0xFFF0FDF4),
       body: SafeArea(
         child: Column(
           children: [
@@ -73,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen>
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [Color(0xFF1A3A6B), Color(0xFF2563EB)],
+                  colors: [Color(0xFF14532D), Color(0xFF16A34A)],
                 ),
                 borderRadius: BorderRadius.only(
                   bottomLeft: Radius.circular(32),
@@ -114,7 +114,6 @@ class _HomeScreenState extends State<HomeScreen>
                           ],
                         ),
                       ),
-                      // Settings button (icon only in header)
                       GestureDetector(
                         onTap: () async {
                           await Navigator.push(
@@ -136,7 +135,6 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // Records button
                       GestureDetector(
                         onTap: () async {
                           await Navigator.push(
@@ -162,7 +160,6 @@ class _HomeScreenState extends State<HomeScreen>
 
                   const SizedBox(height: 20),
 
-                  // Stats row
                   Row(
                     children: [
                       Expanded(
@@ -184,8 +181,7 @@ class _HomeScreenState extends State<HomeScreen>
                       Expanded(
                         child: _headerStat(
                           icon: Icons.payments_rounded,
-                          value:
-                              '₱${_totalCollected.toStringAsFixed(0)}',
+                          value: '₱${_totalCollected.toStringAsFixed(0)}',
                           label: 'Collected',
                           overflow: true,
                         ),
@@ -195,7 +191,6 @@ class _HomeScreenState extends State<HomeScreen>
 
                   const SizedBox(height: 10),
 
-                  // Fee badge
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 8),
@@ -225,7 +220,6 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
 
-            // ─── Main content ─────────────────────────────────────────────────
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -242,7 +236,7 @@ class _HomeScreenState extends State<HomeScreen>
                           borderRadius: BorderRadius.circular(32),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF2563EB).withOpacity(0.15),
+                              color: const Color(0xFF16A34A).withOpacity(0.18),
                               blurRadius: 40,
                               offset: const Offset(0, 10),
                             ),
@@ -255,16 +249,16 @@ class _HomeScreenState extends State<HomeScreen>
                               width: 80,
                               height: 80,
                               decoration: BoxDecoration(
-                                color: const Color(0xFFEFF6FF),
+                                color: const Color(0xFFF0FDF4),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: const Icon(Icons.qr_code_scanner_rounded,
-                                  color: Color(0xFF2563EB), size: 48),
+                                  color: Color(0xFF16A34A), size: 48),
                             ),
                             const SizedBox(height: 12),
                             const Text('QR Scanner',
                                 style: TextStyle(
-                                    color: Color(0xFF1A3A6B),
+                                    color: Color(0xFF14532D),
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600)),
                           ],
@@ -275,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen>
                     const SizedBox(height: 28),
                     const Text('Scan Student ID',
                         style: TextStyle(
-                            color: Color(0xFF1A3A6B),
+                            color: Color(0xFF14532D),
                             fontSize: 24,
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.5)),
@@ -309,7 +303,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 0.3)),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
+                          backgroundColor: const Color(0xFF16A34A),
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -341,9 +335,9 @@ class _HomeScreenState extends State<HomeScreen>
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600)),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF2563EB),
+                                foregroundColor: const Color(0xFF16A34A),
                                 side: const BorderSide(
-                                    color: Color(0xFF2563EB), width: 1.5),
+                                    color: Color(0xFF16A34A), width: 1.5),
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14)),
                               ),
@@ -371,7 +365,7 @@ class _HomeScreenState extends State<HomeScreen>
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600)),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF16A34A),
+                                backgroundColor: const Color(0xFF0D9488),
                                 foregroundColor: Colors.white,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(

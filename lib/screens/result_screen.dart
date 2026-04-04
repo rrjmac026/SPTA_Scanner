@@ -57,24 +57,12 @@ class _ResultScreenState extends State<ResultScreen>
 
   Future<void> _loadOrCreateStudent() async {
     setState(() => _isLoading = true);
-
-    // Try to find existing student
     var info = await _db.getStudentPaymentInfo(widget.lrn);
-
     if (info == null) {
-      // New student — show grade selector before registering
-      setState(() {
-        _isNewStudent = true;
-        _isLoading = false;
-      });
+      setState(() { _isNewStudent = true; _isLoading = false; });
       return;
     }
-
-    setState(() {
-      _info = info;
-      _isNewStudent = false;
-      _isLoading = false;
-    });
+    setState(() { _info = info; _isNewStudent = false; _isLoading = false; });
   }
 
   Future<void> _registerAndContinue() async {
@@ -87,7 +75,6 @@ class _ResultScreenState extends State<ResultScreen>
     );
     final id = await _db.insertStudent(student);
     if (id == null) {
-      // Race condition: was inserted between check and insert
       await _loadOrCreateStudent();
       return;
     }
@@ -141,7 +128,7 @@ class _ResultScreenState extends State<ResultScreen>
                         children: [
                           const Text('Record Payment',
                               style: TextStyle(
-                                  color: Color(0xFF1A3A6B),
+                                  color: Color(0xFF14532D),
                                   fontSize: 16,
                                   fontWeight: FontWeight.w800)),
                           Text(
@@ -155,7 +142,6 @@ class _ResultScreenState extends State<ResultScreen>
                   ],
                 ),
                 const SizedBox(height: 20),
-
                 Text('Payment Amount (₱)',
                     style: TextStyle(
                         color: Colors.grey[600],
@@ -173,16 +159,10 @@ class _ResultScreenState extends State<ResultScreen>
                         RegExp(r'^\d+\.?\d{0,2}')),
                   ],
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Enter an amount';
-                    }
+                    if (v == null || v.trim().isEmpty) return 'Enter an amount';
                     final amt = double.tryParse(v.trim());
-                    if (amt == null || amt <= 0) {
-                      return 'Enter a valid amount greater than 0';
-                    }
-                    if (amt > remaining) {
-                      return 'Cannot exceed remaining balance of ₱${remaining.toStringAsFixed(2)}';
-                    }
+                    if (amt == null || amt <= 0) return 'Enter a valid amount greater than 0';
+                    if (amt > remaining) return 'Cannot exceed remaining balance of ₱${remaining.toStringAsFixed(2)}';
                     return null;
                   },
                   decoration: InputDecoration(
@@ -193,7 +173,7 @@ class _ResultScreenState extends State<ResultScreen>
                       alignment: Alignment.center,
                       child: const Text('₱',
                           style: TextStyle(
-                              color: Color(0xFF2563EB),
+                              color: Color(0xFF16A34A),
                               fontSize: 18,
                               fontWeight: FontWeight.w700)),
                     ),
@@ -212,7 +192,7 @@ class _ResultScreenState extends State<ResultScreen>
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide:
-                          const BorderSide(color: Color(0xFF2563EB), width: 2),
+                          const BorderSide(color: Color(0xFF16A34A), width: 2),
                     ),
                     errorBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -220,8 +200,6 @@ class _ResultScreenState extends State<ResultScreen>
                     ),
                   ),
                 ),
-
-                // Quick-fill buttons
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
@@ -232,7 +210,6 @@ class _ResultScreenState extends State<ResultScreen>
                     if (remaining >= 100) _quickFill('₱100', 100, controller),
                   ],
                 ),
-
                 const SizedBox(height: 20),
                 Row(
                   children: [
@@ -317,11 +294,10 @@ class _ResultScreenState extends State<ResultScreen>
               ],
             ),
             backgroundColor: isNowPaid
-                ? const Color(0xFF7C3AED)
+                ? const Color(0xFF0D9488)
                 : const Color(0xFF16A34A),
             behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             margin: const EdgeInsets.all(16),
             duration: const Duration(seconds: 3),
           ),
@@ -336,13 +312,13 @@ class _ResultScreenState extends State<ResultScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFFEFF6FF),
+          color: const Color(0xFFF0FDF4),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.3)),
+          border: Border.all(color: const Color(0xFF16A34A).withOpacity(0.3)),
         ),
         child: Text(label,
             style: const TextStyle(
-                color: Color(0xFF2563EB),
+                color: Color(0xFF16A34A),
                 fontSize: 12,
                 fontWeight: FontWeight.w700)),
       ),
@@ -352,9 +328,9 @@ class _ResultScreenState extends State<ResultScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4FF),
+      backgroundColor: const Color(0xFFF0FDF4),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A3A6B),
+        backgroundColor: const Color(0xFF14532D),
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -376,7 +352,7 @@ class _ResultScreenState extends State<ResultScreen>
       ),
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF2563EB)))
+              child: CircularProgressIndicator(color: Color(0xFF16A34A)))
           : FadeTransition(
               opacity: _fadeAnim,
               child: SlideTransition(
@@ -389,18 +365,14 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 
-  // ─── Grade selector (new student) ─────────────────────────────────────────
-
   Widget _buildGradeSelector() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Student info card
           _buildStudentInfoCard(),
           const SizedBox(height: 16),
-
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -422,15 +394,15 @@ class _ResultScreenState extends State<ResultScreen>
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                          color: const Color(0xFFEFF6FF),
+                          color: const Color(0xFFF0FDF4),
                           borderRadius: BorderRadius.circular(10)),
                       child: const Icon(Icons.school_rounded,
-                          color: Color(0xFF2563EB), size: 18),
+                          color: Color(0xFF16A34A), size: 18),
                     ),
                     const SizedBox(width: 10),
                     const Text('Select Grade Level',
                         style: TextStyle(
-                            color: Color(0xFF1A3A6B),
+                            color: Color(0xFF14532D),
                             fontSize: 15,
                             fontWeight: FontWeight.w700)),
                   ],
@@ -439,7 +411,6 @@ class _ResultScreenState extends State<ResultScreen>
                 Text('This student is new. Select their grade to register.',
                     style: TextStyle(color: Colors.grey[500], fontSize: 12)),
                 const SizedBox(height: 16),
-
                 Container(
                   decoration: BoxDecoration(
                     border: Border.all(color: const Color(0xFFCBD5E1)),
@@ -454,7 +425,7 @@ class _ResultScreenState extends State<ResultScreen>
                           horizontal: 14, vertical: 4),
                       borderRadius: BorderRadius.circular(12),
                       icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                          color: Color(0xFF2563EB)),
+                          color: Color(0xFF16A34A)),
                       items: _grades.map((grade) {
                         return DropdownMenuItem(
                           value: grade,
@@ -464,12 +435,12 @@ class _ResultScreenState extends State<ResultScreen>
                                 width: 28,
                                 height: 28,
                                 decoration: BoxDecoration(
-                                    color: const Color(0xFFEFF6FF),
+                                    color: const Color(0xFFF0FDF4),
                                     borderRadius: BorderRadius.circular(8)),
                                 child: Center(
                                   child: Text(grade.split(' ').last,
                                       style: const TextStyle(
-                                          color: Color(0xFF2563EB),
+                                          color: Color(0xFF16A34A),
                                           fontSize: 11,
                                           fontWeight: FontWeight.w800)),
                                 ),
@@ -487,7 +458,6 @@ class _ResultScreenState extends State<ResultScreen>
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
@@ -499,7 +469,7 @@ class _ResultScreenState extends State<ResultScreen>
                         style: TextStyle(
                             fontSize: 15, fontWeight: FontWeight.w700)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2563EB),
+                      backgroundColor: const Color(0xFF16A34A),
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -510,15 +480,12 @@ class _ResultScreenState extends State<ResultScreen>
               ],
             ),
           ),
-
           const SizedBox(height: 12),
           _scanAnotherButton(),
         ],
       ),
     );
   }
-
-  // ─── Main payment view (existing student) ──────────────────────────────────
 
   Widget _buildPaymentView() {
     final info = _info!;
@@ -530,25 +497,16 @@ class _ResultScreenState extends State<ResultScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Payment status banner
           _buildStatusBanner(info),
           const SizedBox(height: 14),
-
-          // Student info card
           _buildStudentInfoCard(student: student),
           const SizedBox(height: 14),
-
-          // Payment summary card
           _buildPaymentSummaryCard(info),
           const SizedBox(height: 14),
-
-          // Payment history
           if (info.payments.isNotEmpty) ...[
             _buildPaymentHistoryCard(info.payments),
             const SizedBox(height: 14),
           ],
-
-          // Record payment button
           if (!isFullyPaid) ...[
             SizedBox(
               height: 56,
@@ -581,7 +539,6 @@ class _ResultScreenState extends State<ResultScreen>
             ),
             const SizedBox(height: 10),
           ],
-
           _scanAnotherButton(),
           const SizedBox(height: 10),
           _homeButton(),
@@ -589,8 +546,6 @@ class _ResultScreenState extends State<ResultScreen>
       ),
     );
   }
-
-  // ─── Sub-widgets ──────────────────────────────────────────────────────────
 
   Widget _buildStatusBanner(StudentPaymentInfo info) {
     final Color bg, border, textColor, iconColor;
@@ -654,7 +609,7 @@ class _ResultScreenState extends State<ResultScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF2563EB).withOpacity(0.08),
+            color: const Color(0xFF16A34A).withOpacity(0.1),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -662,12 +617,11 @@ class _ResultScreenState extends State<ResultScreen>
       ),
       child: Column(
         children: [
-          // Header
           Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                  colors: [Color(0xFF1A3A6B), Color(0xFF2563EB)]),
+                  colors: [Color(0xFF14532D), Color(0xFF16A34A)]),
               borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(20), topRight: Radius.circular(20)),
             ),
@@ -694,8 +648,7 @@ class _ResultScreenState extends State<ResultScreen>
                               fontSize: 14,
                               fontWeight: FontWeight.w700)),
                       Text('Scanned from QR Code',
-                          style:
-                              TextStyle(color: Colors.white60, fontSize: 11)),
+                          style: TextStyle(color: Colors.white60, fontSize: 11)),
                     ],
                   ),
                 ),
@@ -703,14 +656,13 @@ class _ResultScreenState extends State<ResultScreen>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF22C55E).withOpacity(0.25),
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                        color: const Color(0xFF22C55E).withOpacity(0.5)),
+                    border: Border.all(color: Colors.white.withOpacity(0.4)),
                   ),
                   child: const Text('SCANNED',
                       style: TextStyle(
-                          color: Color(0xFF86EFAC),
+                          color: Colors.white,
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.8)),
@@ -718,7 +670,6 @@ class _ResultScreenState extends State<ResultScreen>
               ],
             ),
           ),
-          // Details
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -726,18 +677,18 @@ class _ResultScreenState extends State<ResultScreen>
                 _infoRow(Icons.badge_rounded, 'Full Name',
                     name.isNotEmpty ? name : 'Not detected',
                     valueColor: name.isNotEmpty
-                        ? const Color(0xFF1A3A6B)
+                        ? const Color(0xFF14532D)
                         : Colors.red),
                 if (lrn.isNotEmpty) ...[
                   Divider(color: Colors.grey[100], height: 20),
                   _infoRow(Icons.numbers_rounded, 'LRN', lrn,
                       isMonospace: true,
-                      valueColor: const Color(0xFF1A3A6B)),
+                      valueColor: const Color(0xFF14532D)),
                 ],
                 if (grade.isNotEmpty) ...[
                   Divider(color: Colors.grey[100], height: 20),
                   _infoRow(Icons.school_rounded, 'Grade Level', grade,
-                      valueColor: const Color(0xFF2563EB)),
+                      valueColor: const Color(0xFF16A34A)),
                 ],
               ],
             ),
@@ -773,27 +724,25 @@ class _ResultScreenState extends State<ResultScreen>
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
+                    color: const Color(0xFFF0FDF4),
                     borderRadius: BorderRadius.circular(10)),
                 child: const Icon(Icons.receipt_long_rounded,
-                    color: Color(0xFF2563EB), size: 18),
+                    color: Color(0xFF16A34A), size: 18),
               ),
               const SizedBox(width: 10),
               const Text('Payment Summary',
                   style: TextStyle(
-                      color: Color(0xFF1A3A6B),
+                      color: Color(0xFF14532D),
                       fontSize: 15,
                       fontWeight: FontWeight.w700)),
             ],
           ),
           const SizedBox(height: 18),
-
-          // Three-column stats
           Row(
             children: [
               Expanded(
                   child: _summaryStatBox('Total Fee',
-                      '₱${info.totalFee.toStringAsFixed(2)}', const Color(0xFF1A3A6B))),
+                      '₱${info.totalFee.toStringAsFixed(2)}', const Color(0xFF14532D))),
               const SizedBox(width: 10),
               Expanded(
                   child: _summaryStatBox('Amount Paid',
@@ -808,10 +757,7 @@ class _ResultScreenState extends State<ResultScreen>
                           : const Color(0xFFDC2626))),
             ],
           ),
-
           const SizedBox(height: 16),
-
-          // Progress bar
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -825,7 +771,7 @@ class _ResultScreenState extends State<ResultScreen>
                           fontWeight: FontWeight.w600)),
                   Text('${(pct * 100).toStringAsFixed(0)}%',
                       style: const TextStyle(
-                          color: Color(0xFF1A3A6B),
+                          color: Color(0xFF14532D),
                           fontSize: 12,
                           fontWeight: FontWeight.w800)),
                 ],
@@ -840,14 +786,12 @@ class _ResultScreenState extends State<ResultScreen>
                   valueColor: AlwaysStoppedAnimation<Color>(
                     info.isFullyPaid
                         ? const Color(0xFF16A34A)
-                        : const Color(0xFF2563EB),
+                        : const Color(0xFF4ADE80),
                   ),
                 ),
               ),
             ],
           ),
-
-          // Remaining balance highlight (only if not fully paid)
           if (!info.isFullyPaid) ...[
             const SizedBox(height: 16),
             Container(
@@ -897,9 +841,7 @@ class _ResultScreenState extends State<ResultScreen>
         children: [
           Text(value,
               style: TextStyle(
-                  color: color,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800),
+                  color: color, fontSize: 14, fontWeight: FontWeight.w800),
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis),
@@ -937,15 +879,15 @@ class _ResultScreenState extends State<ResultScreen>
                   width: 34,
                   height: 34,
                   decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
+                      color: const Color(0xFFF0FDF4),
                       borderRadius: BorderRadius.circular(10)),
                   child: const Icon(Icons.history_rounded,
-                      color: Color(0xFF2563EB), size: 18),
+                      color: Color(0xFF16A34A), size: 18),
                 ),
                 const SizedBox(width: 10),
                 Text('Payment History (${payments.length})',
                     style: const TextStyle(
-                        color: Color(0xFF1A3A6B),
+                        color: Color(0xFF14532D),
                         fontSize: 14,
                         fontWeight: FontWeight.w700)),
               ],
@@ -959,8 +901,8 @@ class _ResultScreenState extends State<ResultScreen>
             return Column(
               children: [
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
                   child: Row(
                     children: [
                       Container(
@@ -986,14 +928,12 @@ class _ResultScreenState extends State<ResultScreen>
                             Text(
                               _formatDate(p.createdAt),
                               style: const TextStyle(
-                                  color: Color(0xFF64748B),
-                                  fontSize: 11),
+                                  color: Color(0xFF64748B), fontSize: 11),
                             ),
                             if (p.note.isNotEmpty)
                               Text(p.note,
                                   style: TextStyle(
-                                      color: Colors.grey[400],
-                                      fontSize: 10)),
+                                      color: Colors.grey[400], fontSize: 10)),
                           ],
                         ),
                       ),
@@ -1006,8 +946,7 @@ class _ResultScreenState extends State<ResultScreen>
                   ),
                 ),
                 if (!isLast)
-                  Divider(
-                      color: Colors.grey[100], height: 1, indent: 16),
+                  Divider(color: Colors.grey[100], height: 1, indent: 16),
               ],
             );
           }),
@@ -1026,9 +965,9 @@ class _ResultScreenState extends State<ResultScreen>
           width: 34,
           height: 34,
           decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
+              color: const Color(0xFFF0FDF4),
               borderRadius: BorderRadius.circular(10)),
-          child: Icon(icon, color: const Color(0xFF2563EB), size: 17),
+          child: Icon(icon, color: const Color(0xFF16A34A), size: 17),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -1044,7 +983,7 @@ class _ResultScreenState extends State<ResultScreen>
               const SizedBox(height: 2),
               Text(value,
                   style: TextStyle(
-                      color: valueColor ?? const Color(0xFF1A3A6B),
+                      color: valueColor ?? const Color(0xFF14532D),
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                       fontFamily: isMonospace ? 'monospace' : null,
@@ -1068,10 +1007,9 @@ class _ResultScreenState extends State<ResultScreen>
         label: const Text('Scan Another Student',
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
         style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFF2563EB),
-          side: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          foregroundColor: const Color(0xFF16A34A),
+          side: const BorderSide(color: Color(0xFF16A34A), width: 1.5),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
     );
@@ -1087,8 +1025,7 @@ class _ResultScreenState extends State<ResultScreen>
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
         style: TextButton.styleFrom(
           foregroundColor: Colors.grey[600],
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
     );
