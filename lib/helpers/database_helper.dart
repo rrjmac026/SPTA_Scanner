@@ -1,93 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
-
-// ─── Models ──────────────────────────────────────────────────────────────────
-
-class Student {
-  final int? id;
-  final String name;
-  final String lrn;
-  final String grade;
-  final String createdAt;
-
-  Student({
-    this.id,
-    required this.name,
-    required this.lrn,
-    required this.grade,
-    required this.createdAt,
-  });
-
-  Map<String, dynamic> toMap() => {
-        'id': id,
-        'name': name,
-        'lrn': lrn,
-        'grade': grade,
-        'created_at': createdAt,
-      };
-
-  factory Student.fromMap(Map<String, dynamic> map) => Student(
-        id: map['id'] as int?,
-        name: map['name'] as String,
-        lrn: map['lrn'] as String,
-        grade: map['grade'] as String? ?? '',
-        createdAt: map['created_at'] as String,
-      );
-}
-
-class Payment {
-  final int? id;
-  final int studentId;
-  final double amount;
-  final String note;
-  final String createdAt;
-
-  Payment({
-    this.id,
-    required this.studentId,
-    required this.amount,
-    this.note = '',
-    required this.createdAt,
-  });
-
-  Map<String, dynamic> toMap() => {
-        'id': id,
-        'student_id': studentId,
-        'amount': amount,
-        'note': note,
-        'created_at': createdAt,
-      };
-
-  factory Payment.fromMap(Map<String, dynamic> map) => Payment(
-        id: map['id'] as int?,
-        studentId: map['student_id'] as int,
-        amount: (map['amount'] as num).toDouble(),
-        note: map['note'] as String? ?? '',
-        createdAt: map['created_at'] as String,
-      );
-}
-
-/// A convenience wrapper that combines a Student with their payment summary.
-class StudentPaymentInfo {
-  final Student student;
-  final double totalFee;
-  final double amountPaid;
-  final List<Payment> payments;
-
-  StudentPaymentInfo({
-    required this.student,
-    required this.totalFee,
-    required this.amountPaid,
-    required this.payments,
-  });
-
-  double get remainingBalance => (totalFee - amountPaid).clamp(0, double.infinity);
-  bool get isFullyPaid => remainingBalance <= 0;
-  String get paymentStatus => isFullyPaid ? 'Fully Paid' : (amountPaid > 0 ? 'Partial' : 'Unpaid');
-}
-
-// ─── DatabaseHelper ───────────────────────────────────────────────────────────
+import '../models/models.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -114,7 +28,6 @@ class DatabaseHelper {
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    // Students table — no amount column; payments are in their own table
     await db.execute('''
       CREATE TABLE students (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -124,8 +37,6 @@ class DatabaseHelper {
         created_at TEXT NOT NULL
       )
     ''');
-
-    // Per-student installment payments
     await db.execute('''
       CREATE TABLE payments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -136,22 +47,17 @@ class DatabaseHelper {
         FOREIGN KEY (student_id) REFERENCES students(id)
       )
     ''');
-
-    // App-wide settings (key-value store)
     await db.execute('''
       CREATE TABLE settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
       )
     ''');
-
-    // Default total SPTA fee
     await db.insert('settings', {'key': 'total_fee', 'value': '750'});
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 3) {
-      // Migrate from old schema: create new tables if missing
       await db.execute('''
         CREATE TABLE IF NOT EXISTS payments (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -168,8 +74,6 @@ class DatabaseHelper {
           value TEXT NOT NULL
         )
       ''');
-
-      // Migrate old amount column data into payments table
       try {
         final oldStudents = await db.rawQuery(
             'SELECT id, amount, created_at FROM students WHERE amount IS NOT NULL AND amount > 0');
@@ -186,8 +90,6 @@ class DatabaseHelper {
           }
         }
       } catch (_) {}
-
-      // Insert default fee if not present
       await db.insert(
         'settings',
         {'key': 'total_fee', 'value': '750'},
@@ -200,7 +102,8 @@ class DatabaseHelper {
 
   Future<double> getTotalFee() async {
     final db = await database;
-    final rows = await db.query('settings', where: 'key = ?', whereArgs: ['total_fee']);
+    final rows =
+        await db.query('settings', where: 'key = ?', whereArgs: ['total_fee']);
     if (rows.isEmpty) return 750.0;
     return double.tryParse(rows.first['value'] as String) ?? 750.0;
   }
@@ -219,21 +122,24 @@ class DatabaseHelper {
   /// Returns the inserted student's id, or null if LRN already exists.
   Future<int?> insertStudent(Student student) async {
     final db = await database;
-    final existing = await db.query('students', where: 'lrn = ?', whereArgs: [student.lrn]);
+    final existing =
+        await db.query('students', where: 'lrn = ?', whereArgs: [student.lrn]);
     if (existing.isNotEmpty) return null;
     return await db.insert('students', student.toMap());
   }
 
   Future<Student?> getStudentByLrn(String lrn) async {
     final db = await database;
-    final rows = await db.query('students', where: 'lrn = ?', whereArgs: [lrn]);
+    final rows =
+        await db.query('students', where: 'lrn = ?', whereArgs: [lrn]);
     if (rows.isEmpty) return null;
     return Student.fromMap(rows.first);
   }
 
   Future<bool> studentExists(String lrn) async {
     final db = await database;
-    final result = await db.query('students', where: 'lrn = ?', whereArgs: [lrn]);
+    final result =
+        await db.query('students', where: 'lrn = ?', whereArgs: [lrn]);
     return result.isNotEmpty;
   }
 
@@ -271,13 +177,13 @@ class DatabaseHelper {
   Future<double> getAmountPaidForStudent(int studentId) async {
     final db = await database;
     final result = await db.rawQuery(
-        'SELECT SUM(amount) as total FROM payments WHERE student_id = ?', [studentId]);
+        'SELECT SUM(amount) as total FROM payments WHERE student_id = ?',
+        [studentId]);
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
 
   // ─── Aggregates ────────────────────────────────────────────────────────────
 
-  /// Full info for one student (by LRN).
   Future<StudentPaymentInfo?> getStudentPaymentInfo(String lrn) async {
     final student = await getStudentByLrn(lrn);
     if (student == null) return null;
@@ -292,7 +198,6 @@ class DatabaseHelper {
     );
   }
 
-  /// Full info for all students.
   Future<List<StudentPaymentInfo>> getAllStudentPaymentInfos() async {
     final students = await getAllStudents();
     final totalFee = await getTotalFee();
@@ -312,13 +217,15 @@ class DatabaseHelper {
 
   Future<int> getTotalStudentCount() async {
     final db = await database;
-    final result = await db.rawQuery('SELECT COUNT(*) as count FROM students');
+    final result =
+        await db.rawQuery('SELECT COUNT(*) as count FROM students');
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
   Future<double> getTotalCollected() async {
     final db = await database;
-    final result = await db.rawQuery('SELECT SUM(amount) as total FROM payments');
+    final result =
+        await db.rawQuery('SELECT SUM(amount) as total FROM payments');
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
 
@@ -326,6 +233,8 @@ class DatabaseHelper {
     final db = await database;
     final result = await db.rawQuery(
         'SELECT grade, COUNT(*) as count FROM students GROUP BY grade ORDER BY grade');
-    return {for (var row in result) row['grade'] as String: row['count'] as int};
+    return {
+      for (var row in result) row['grade'] as String: row['count'] as int
+    };
   }
 }

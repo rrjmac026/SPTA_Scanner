@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../helpers/database_helper.dart';
+import '../models/models.dart';
+import 'widgets/student_info_form.dart';
+import 'widgets/payment_details_form.dart';
 
 class AddTransactionScreen extends StatefulWidget {
   const AddTransactionScreen({super.key});
@@ -24,7 +26,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
   bool _lrnExists = false;
   bool _lrnChecked = false;
   StudentPaymentInfo? _existingInfo;
-
   double _totalFee = 750;
 
   final List<String> _grades = [
@@ -108,11 +109,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       studentId = _existingInfo!.student.id!;
     } else {
       final student = Student(
-        name: name,
-        lrn: lrn,
-        grade: _selectedGrade,
-        createdAt: now,
-      );
+          name: name, lrn: lrn, grade: _selectedGrade, createdAt: now);
       final id = await _db.insertStudent(student);
       if (id == null) {
         setState(() => _isSaving = false);
@@ -221,8 +218,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _successStat('Amount Paid',
-                      '₱${amount.toStringAsFixed(2)}', const Color(0xFF16A34A)),
+                  _successStat('Amount Paid', '₱${amount.toStringAsFixed(2)}',
+                      const Color(0xFF16A34A)),
                   Container(width: 1, height: 36, color: Colors.grey[200]),
                   _successStat(
                       'Balance',
@@ -231,8 +228,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                           ? const Color(0xFF16A34A)
                           : const Color(0xFFDC2626)),
                   Container(width: 1, height: 36, color: Colors.grey[200]),
-                  _successStat('Status',
-                      isFullyPaid ? 'Paid ✓' : 'Partial',
+                  _successStat('Status', isFullyPaid ? 'Paid ✓' : 'Partial',
                       isFullyPaid
                           ? const Color(0xFF16A34A)
                           : const Color(0xFFF97316)),
@@ -318,8 +314,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
             style: TextStyle(
                 color: color, fontSize: 14, fontWeight: FontWeight.w800)),
         const SizedBox(height: 2),
-        Text(label,
-            style: TextStyle(color: Colors.grey[500], fontSize: 10)),
+        Text(label, style: TextStyle(color: Colors.grey[500], fontSize: 10)),
       ],
     );
   }
@@ -335,6 +330,52 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       _lrnChecked = false;
       _existingInfo = null;
     });
+  }
+
+  Widget _sectionCard({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required String title,
+    required Widget child,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 4))
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                    color: iconBg, borderRadius: BorderRadius.circular(11)),
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Text(title,
+                  style: const TextStyle(
+                      color: Color(0xFF14532D),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 18),
+          child,
+        ],
+      ),
+    );
   }
 
   @override
@@ -404,212 +445,30 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                   iconColor: const Color(0xFF16A34A),
                   iconBg: const Color(0xFFF0FDF4),
                   title: 'Student Information',
-                  child: Column(
-                    children: [
-                      _fieldLabel('Learner Reference Number (LRN)'),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _lrnController,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly
-                        ],
-                        onChanged: (v) {
-                          if (v.length >= 6) _checkLrn(v);
-                          if (v.isEmpty) {
-                            setState(() {
-                              _lrnExists = false;
-                              _lrnChecked = false;
-                              _existingInfo = null;
-                            });
-                          }
-                        },
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return 'LRN is required';
-                          }
-                          return null;
-                        },
-                        decoration: _inputDecoration(
-                          hint: 'e.g. 123456789012',
-                          prefix: const Icon(Icons.numbers_rounded,
-                              color: Color(0xFF94A3B8), size: 18),
-                          suffix: _lrnChecked
-                              ? Icon(
-                                  _lrnExists
-                                      ? Icons.person_rounded
-                                      : Icons.person_add_rounded,
-                                  color: _lrnExists
-                                      ? const Color(0xFF16A34A)
-                                      : const Color(0xFF0D9488),
-                                  size: 20,
-                                )
-                              : null,
-                        ),
-                      ),
-
-                      if (_lrnChecked && _lrnExists && _existingInfo != null) ...[
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFDCFCE7),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color: const Color(0xFF22C55E).withOpacity(0.4)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.check_circle_rounded,
-                                  color: Color(0xFF16A34A), size: 18),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Student found: ${_existingInfo!.student.name}',
-                                      style: const TextStyle(
-                                          color: Color(0xFF166534),
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700),
-                                    ),
-                                    Text(
-                                      '${_existingInfo!.student.grade}  •  Paid: ₱${amountPaid.toStringAsFixed(2)}  •  Balance: ₱${remaining.toStringAsFixed(2)}',
-                                      style: const TextStyle(
-                                          color: Color(0xFF166534),
-                                          fontSize: 11),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-
-                      if (_lrnChecked && !_lrnExists) ...[
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF0FDF4),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color: const Color(0xFF16A34A).withOpacity(0.3)),
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.person_add_rounded,
-                                  color: Color(0xFF16A34A), size: 18),
-                              SizedBox(width: 8),
-                              Text(
-                                'New student — will be registered',
-                                style: TextStyle(
-                                    color: Color(0xFF166534),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-
-                      const SizedBox(height: 16),
-
-                      _fieldLabel('Full Name'),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _nameController,
-                        readOnly: _lrnExists,
-                        textCapitalization: TextCapitalization.words,
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return 'Full name is required';
-                          }
-                          return null;
-                        },
-                        decoration: _inputDecoration(
-                          hint: 'e.g. Juan Dela Cruz',
-                          prefix: const Icon(Icons.badge_rounded,
-                              color: Color(0xFF94A3B8), size: 18),
-                          filled: _lrnExists,
-                          fillOverride: _lrnExists
-                              ? const Color(0xFFF1F5F9)
-                              : null,
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      _fieldLabel('Grade Level'),
-                      const SizedBox(height: 8),
-                      IgnorePointer(
-                        ignoring: _lrnExists,
-                        child: Opacity(
-                          opacity: _lrnExists ? 0.6 : 1.0,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: _lrnExists
-                                  ? const Color(0xFFF1F5F9)
-                                  : const Color(0xFFF8FAFC),
-                              border: Border.all(
-                                  color: const Color(0xFFCBD5E1)),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: _selectedGrade,
-                                isExpanded: true,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 2),
-                                borderRadius: BorderRadius.circular(12),
-                                icon: const Icon(
-                                    Icons.keyboard_arrow_down_rounded,
-                                    color: Color(0xFF16A34A)),
-                                items: _grades.map((grade) {
-                                  return DropdownMenuItem(
-                                    value: grade,
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 26,
-                                          height: 26,
-                                          decoration: BoxDecoration(
-                                              color: const Color(0xFFF0FDF4),
-                                              borderRadius:
-                                                  BorderRadius.circular(7)),
-                                          child: Center(
-                                            child: Text(
-                                                grade.split(' ').last,
-                                                style: const TextStyle(
-                                                    color: Color(0xFF16A34A),
-                                                    fontSize: 10,
-                                                    fontWeight:
-                                                        FontWeight.w800)),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Text(grade,
-                                            style: const TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w500)),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
-                                onChanged: _lrnExists
-                                    ? null
-                                    : (v) => setState(() => _selectedGrade = v!),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: StudentInfoForm(
+                    lrnController: _lrnController,
+                    nameController: _nameController,
+                    selectedGrade: _selectedGrade,
+                    grades: _grades,
+                    lrnChecked: _lrnChecked,
+                    lrnExists: _lrnExists,
+                    existingInfo: _existingInfo,
+                    amountPaid: amountPaid,
+                    remaining: remaining,
+                    onLrnChanged: (v) {
+                      if (v.length >= 6) _checkLrn(v);
+                      if (v.isEmpty) {
+                        setState(() {
+                          _lrnExists = false;
+                          _lrnChecked = false;
+                          _existingInfo = null;
+                        });
+                      }
+                    },
+                    onGradeChanged: (v) =>
+                        setState(() => _selectedGrade = v!),
                   ),
                 ),
-
                 const SizedBox(height: 16),
 
                 _sectionCard(
@@ -617,129 +476,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                   iconColor: const Color(0xFF0D9488),
                   iconBg: const Color(0xFFCCFBF1),
                   title: 'Payment Details',
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _feeRow(
-                                'Total Fee',
-                                '₱${_totalFee.toStringAsFixed(2)}',
-                                const Color(0xFF14532D),
-                              ),
-                            ),
-                            if (_lrnExists) ...[
-                              Container(
-                                  width: 1,
-                                  height: 36,
-                                  color: Colors.grey[200]),
-                              Expanded(
-                                child: _feeRow(
-                                  'Already Paid',
-                                  '₱${amountPaid.toStringAsFixed(2)}',
-                                  const Color(0xFF16A34A),
-                                ),
-                              ),
-                              Container(
-                                  width: 1,
-                                  height: 36,
-                                  color: Colors.grey[200]),
-                              Expanded(
-                                child: _feeRow(
-                                  'Balance',
-                                  '₱${remaining.toStringAsFixed(2)}',
-                                  remaining <= 0
-                                      ? const Color(0xFF16A34A)
-                                      : const Color(0xFFDC2626),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-
-                      if (_lrnExists && remaining <= 0) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFDCFCE7),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.verified_rounded,
-                                  color: Color(0xFF16A34A), size: 20),
-                              SizedBox(width: 8),
-                              Text('This student is already fully paid!',
-                                  style: TextStyle(
-                                      color: Color(0xFF166534),
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                      ] else ...[
-                        const SizedBox(height: 16),
-                        _fieldLabel('Payment Amount (₱)'),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _amountController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(
-                                RegExp(r'^\d+\.?\d{0,2}')),
-                          ],
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) {
-                              return 'Amount is required';
-                            }
-                            final amt = double.tryParse(v.trim());
-                            if (amt == null || amt <= 0) {
-                              return 'Enter a valid amount';
-                            }
-                            if (amt > remaining) {
-                              return 'Cannot exceed balance of ₱${remaining.toStringAsFixed(2)}';
-                            }
-                            return null;
-                          },
-                          decoration: _inputDecoration(
-                            hint: remaining.toStringAsFixed(2),
-                            prefix: Container(
-                              alignment: Alignment.center,
-                              width: 38,
-                              child: const Text('₱',
-                                  style: TextStyle(
-                                      color: Color(0xFF16A34A),
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700)),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _quickChip('Full', remaining),
-                            if (remaining >= 500) _quickChip('₱500', 500),
-                            if (remaining >= 250) _quickChip('₱250', 250),
-                            if (remaining >= 100) _quickChip('₱100', 100),
-                          ],
-                        ),
-                      ],
-                    ],
+                  child: PaymentDetailsForm(
+                    amountController: _amountController,
+                    totalFee: _totalFee,
+                    amountPaid: amountPaid,
+                    remaining: remaining,
+                    lrnExists: _lrnExists,
                   ),
                 ),
-
                 const SizedBox(height: 24),
 
                 SizedBox(
@@ -775,7 +519,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 10),
 
                 SizedBox(
@@ -789,151 +532,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                             fontWeight: FontWeight.w600)),
                   ),
                 ),
-
                 const SizedBox(height: 16),
               ],
             ),
           ),
         ),
       ),
-    );
-  }
-
-  Widget _sectionCard({
-    required IconData icon,
-    required Color iconColor,
-    required Color iconBg,
-    required String title,
-    required Widget child,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 16,
-              offset: const Offset(0, 4))
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                    color: iconBg, borderRadius: BorderRadius.circular(11)),
-                child: Icon(icon, color: iconColor, size: 20),
-              ),
-              const SizedBox(width: 10),
-              Text(title,
-                  style: const TextStyle(
-                      color: Color(0xFF14532D),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700)),
-            ],
-          ),
-          const SizedBox(height: 18),
-          child,
-        ],
-      ),
-    );
-  }
-
-  Widget _fieldLabel(String label) {
-    return Text(label,
-        style: TextStyle(
-            color: Colors.grey[600],
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.3));
-  }
-
-  InputDecoration _inputDecoration({
-    required String hint,
-    Widget? prefix,
-    Widget? suffix,
-    bool filled = true,
-    Color? fillOverride,
-  }) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-      prefixIcon: prefix != null
-          ? Padding(
-              padding: const EdgeInsets.only(left: 12, right: 8),
-              child: prefix)
-          : null,
-      prefixIconConstraints:
-          const BoxConstraints(minWidth: 0, minHeight: 0),
-      suffixIcon: suffix != null
-          ? Padding(
-              padding: const EdgeInsets.only(right: 12), child: suffix)
-          : null,
-      suffixIconConstraints:
-          const BoxConstraints(minWidth: 0, minHeight: 0),
-      filled: filled,
-      fillColor: fillOverride ?? const Color(0xFFF8FAFC),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF16A34A), width: 2),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.red),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.red, width: 2),
-      ),
-    );
-  }
-
-  Widget _quickChip(String label, double amount) {
-    return GestureDetector(
-      onTap: () => _amountController.text = amount.toStringAsFixed(2),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF0FDF4),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: const Color(0xFF16A34A).withOpacity(0.3)),
-        ),
-        child: Text(label,
-            style: const TextStyle(
-                color: Color(0xFF16A34A),
-                fontSize: 12,
-                fontWeight: FontWeight.w700)),
-      ),
-    );
-  }
-
-  Widget _feeRow(String label, String value, Color color) {
-    return Column(
-      children: [
-        Text(value,
-            style: TextStyle(
-                color: color, fontSize: 13, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 2),
-        Text(label,
-            style: TextStyle(color: Colors.grey[500], fontSize: 10)),
-      ],
     );
   }
 }

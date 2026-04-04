@@ -1,10 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:share_plus/share_plus.dart';
 import '../helpers/database_helper.dart';
 import '../helpers/export_helper.dart';
+import '../models/models.dart';
+import 'widgets/student_card.dart';
+import 'widgets/export_bottom_sheet.dart';
 
 class RecordsScreen extends StatefulWidget {
   const RecordsScreen({super.key});
@@ -26,7 +28,9 @@ class _RecordsScreenState extends State<RecordsScreen> {
     'All', 'Grade 7', 'Grade 8', 'Grade 9',
     'Grade 10', 'Grade 11', 'Grade 12',
   ];
-  final List<String> _statusFilters = ['All', 'Fully Paid', 'Partial', 'Unpaid'];
+  final List<String> _statusFilters = [
+    'All', 'Fully Paid', 'Partial', 'Unpaid'
+  ];
 
   @override
   void initState() {
@@ -52,14 +56,6 @@ class _RecordsScreenState extends State<RecordsScreen> {
           info.student.lrn.contains(q);
       return matchGrade && matchStatus && matchSearch;
     }).toList();
-  }
-
-  String _formatDate(String dateStr) {
-    try {
-      return DateFormat('MMM d, yyyy  h:mm a').format(DateTime.parse(dateStr));
-    } catch (_) {
-      return dateStr;
-    }
   }
 
   Future<void> _exportExcel() async {
@@ -184,139 +180,65 @@ class _RecordsScreenState extends State<RecordsScreen> {
 
   void _showExportOptions() {
     final count = _filtered.isEmpty ? _infos.length : _filtered.length;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        margin: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-            color: Colors.white, borderRadius: BorderRadius.circular(20)),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Export Records',
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF14532D))),
-            const SizedBox(height: 4),
-            Text('Exporting $count records',
-                style: TextStyle(color: Colors.grey[500], fontSize: 13)),
-            const SizedBox(height: 20),
-            _exportTile(
-              icon: Icons.table_chart_rounded,
-              color: const Color(0xFF16A34A),
-              bgColor: const Color(0xFFDCFCE7),
-              title: 'Export as Excel (.xlsx)',
-              subtitle: 'Full spreadsheet with payment details',
-              onTap: () { Navigator.pop(context); _exportExcel(); },
-            ),
-            const SizedBox(height: 12),
-            _exportTile(
-              icon: Icons.picture_as_pdf_rounded,
-              color: const Color(0xFFDC2626),
-              bgColor: const Color(0xFFFEE2E2),
-              title: 'Export as PDF',
-              subtitle: 'Printable report with grade summary',
-              onTap: () { Navigator.pop(context); _exportPdf(); },
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+    ExportBottomSheet.show(
+      context,
+      recordCount: count,
+      onExcelTap: _exportExcel,
+      onPdfTap: _exportPdf,
     );
   }
 
-  Widget _exportTile({
-    required IconData icon,
-    required Color color,
-    required Color bgColor,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
+  Widget _filterChip(String label, String selected, VoidCallback onTap) {
+    final isSelected = selected == label;
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          color: bgColor.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.3)),
+          color:
+              isSelected ? Colors.white : Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: isSelected
+                  ? Colors.white
+                  : Colors.white.withOpacity(0.3)),
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                  color: bgColor, borderRadius: BorderRadius.circular(12)),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          color: color)),
-                  Text(subtitle,
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right_rounded, color: color),
-          ],
-        ),
+        child: Text(label,
+            style: TextStyle(
+                color: isSelected
+                    ? const Color(0xFF14532D)
+                    : Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w600)),
       ),
     );
   }
 
-  Widget _statusChip(String status) {
-    late Color bg, text;
-    late IconData icon;
-    switch (status) {
-      case 'Fully Paid':
-        bg = const Color(0xFFDCFCE7);
-        text = const Color(0xFF16A34A);
-        icon = Icons.check_circle_rounded;
-        break;
-      case 'Partial':
-        bg = const Color(0xFFFFF7ED);
-        text = const Color(0xFFF97316);
-        icon = Icons.pending_rounded;
-        break;
-      default:
-        bg = const Color(0xFFFEE2E2);
-        text = const Color(0xFFDC2626);
-        icon = Icons.cancel_rounded;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-          color: bg, borderRadius: BorderRadius.circular(20)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: text, size: 12),
-          const SizedBox(width: 4),
-          Text(status,
-              style: TextStyle(
-                  color: text, fontSize: 11, fontWeight: FontWeight.w700)),
-        ],
-      ),
+  Widget _statItem(String value, String label, IconData icon, Color color) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 5),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(value,
+                style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w800, color: color)),
+            Text(label,
+                style: TextStyle(fontSize: 9, color: Colors.grey[500])),
+          ],
+        ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
-    final totalCollected = filtered.fold<double>(0, (s, i) => s + i.amountPaid);
+    final totalCollected =
+        filtered.fold<double>(0, (s, i) => s + i.amountPaid);
     final fullyPaidCount = filtered.where((i) => i.isFullyPaid).length;
 
     return Scaffold(
@@ -378,7 +300,8 @@ class _RecordsScreenState extends State<RecordsScreen> {
                         color: Colors.white.withOpacity(0.6), size: 20),
                     filled: true,
                     fillColor: Colors.white.withOpacity(0.15),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    contentPadding:
+                        const EdgeInsets.symmetric(vertical: 10),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -394,7 +317,8 @@ class _RecordsScreenState extends State<RecordsScreen> {
                     separatorBuilder: (_, __) => const SizedBox(width: 6),
                     itemBuilder: (_, i) => _filterChip(
                         _gradeFilters[i], _selectedGradeFilter,
-                        () => setState(() => _selectedGradeFilter = _gradeFilters[i])),
+                        () => setState(
+                            () => _selectedGradeFilter = _gradeFilters[i])),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -406,7 +330,8 @@ class _RecordsScreenState extends State<RecordsScreen> {
                     separatorBuilder: (_, __) => const SizedBox(width: 6),
                     itemBuilder: (_, i) => _filterChip(
                         _statusFilters[i], _selectedStatusFilter,
-                        () => setState(() => _selectedStatusFilter = _statusFilters[i])),
+                        () => setState(() =>
+                            _selectedStatusFilter = _statusFilters[i])),
                   ),
                 ),
               ],
@@ -417,7 +342,8 @@ class _RecordsScreenState extends State<RecordsScreen> {
           if (!_isLoading && _infos.isNotEmpty)
             Container(
               color: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Row(
                 children: [
                   _statItem('${filtered.length}', 'Students',
@@ -442,7 +368,8 @@ class _RecordsScreenState extends State<RecordsScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF16A34A)))
+                    child: CircularProgressIndicator(
+                        color: Color(0xFF16A34A)))
                 : filtered.isEmpty
                     ? Center(
                         child: Column(
@@ -475,157 +402,10 @@ class _RecordsScreenState extends State<RecordsScreen> {
                     : ListView.builder(
                         padding: const EdgeInsets.all(16),
                         itemCount: filtered.length,
-                        itemBuilder: (_, i) {
-                          final info = filtered[i];
-                          final s = info.student;
-                          final pct = info.totalFee > 0
-                              ? (info.amountPaid / info.totalFee).clamp(0.0, 1.0)
-                              : 0.0;
-
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.04),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(14),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 36,
-                                        height: 36,
-                                        decoration: BoxDecoration(
-                                            color: const Color(0xFFF0FDF4),
-                                            borderRadius:
-                                                BorderRadius.circular(10)),
-                                        child: Center(
-                                          child: Text('${i + 1}',
-                                              style: const TextStyle(
-                                                  color: Color(0xFF16A34A),
-                                                  fontWeight: FontWeight.w800,
-                                                  fontSize: 13)),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(s.name,
-                                                style: const TextStyle(
-                                                    color: Color(0xFF14532D),
-                                                    fontWeight: FontWeight.w700,
-                                                    fontSize: 14)),
-                                            const SizedBox(height: 1),
-                                            Text('LRN: ${s.lrn}',
-                                                style: const TextStyle(
-                                                    color: Color(0xFF64748B),
-                                                    fontSize: 11,
-                                                    fontFamily: 'monospace')),
-                                          ],
-                                        ),
-                                      ),
-                                      _statusChip(info.paymentStatus),
-                                    ],
-                                  ),
-
-                                  const SizedBox(height: 10),
-                                  const Divider(height: 1),
-                                  const SizedBox(height: 10),
-
-                                  Row(
-                                    children: [
-                                      if (s.grade.isNotEmpty) ...[
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 8, vertical: 3),
-                                          decoration: BoxDecoration(
-                                              color: const Color(0xFFF0FDF4),
-                                              borderRadius:
-                                                  BorderRadius.circular(8)),
-                                          child: Text(s.grade,
-                                              style: const TextStyle(
-                                                  color: Color(0xFF16A34A),
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w700)),
-                                        ),
-                                        const SizedBox(width: 8),
-                                      ],
-                                      Text(
-                                        _formatDate(s.createdAt),
-                                        style: TextStyle(
-                                            color: Colors.grey[400],
-                                            fontSize: 10),
-                                      ),
-                                    ],
-                                  ),
-
-                                  const SizedBox(height: 10),
-
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                          child: _miniStat(
-                                              'Total Fee',
-                                              '₱${info.totalFee.toStringAsFixed(2)}',
-                                              const Color(0xFF64748B))),
-                                      Expanded(
-                                          child: _miniStat(
-                                              'Paid',
-                                              '₱${info.amountPaid.toStringAsFixed(2)}',
-                                              const Color(0xFF16A34A))),
-                                      Expanded(
-                                          child: _miniStat(
-                                              'Balance',
-                                              '₱${info.remainingBalance.toStringAsFixed(2)}',
-                                              info.isFullyPaid
-                                                  ? const Color(0xFF16A34A)
-                                                  : const Color(0xFFDC2626))),
-                                    ],
-                                  ),
-
-                                  const SizedBox(height: 8),
-
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: LinearProgressIndicator(
-                                      value: pct,
-                                      minHeight: 6,
-                                      backgroundColor: const Color(0xFFE2E8F0),
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        info.isFullyPaid
-                                            ? const Color(0xFF16A34A)
-                                            : const Color(0xFF4ADE80),
-                                      ),
-                                    ),
-                                  ),
-
-                                  if (info.payments.isNotEmpty) ...[
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      '${info.payments.length} payment${info.payments.length > 1 ? 's' : ''} recorded',
-                                      style: TextStyle(
-                                          color: Colors.grey[400],
-                                          fontSize: 10),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                        itemBuilder: (_, i) => StudentCard(
+                          info: filtered[i],
+                          index: i,
+                        ),
                       ),
           ),
         ],
@@ -645,64 +425,6 @@ class _RecordsScreenState extends State<RecordsScreen> {
                   : const Icon(Icons.download_rounded),
               label: Text(_isExporting ? 'Exporting...' : 'Export'),
             ),
-    );
-  }
-
-  Widget _filterChip(String label, String selected, VoidCallback onTap) {
-    final isSelected = selected == label;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.white.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: isSelected ? Colors.white : Colors.white.withOpacity(0.3)),
-        ),
-        child: Text(label,
-            style: TextStyle(
-                color: isSelected ? const Color(0xFF14532D) : Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w600)),
-      ),
-    );
-  }
-
-  Widget _statItem(String value, String label, IconData icon, Color color) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 5),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(value,
-                style: TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w800, color: color)),
-            Text(label,
-                style: TextStyle(fontSize: 9, color: Colors.grey[500])),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _miniStat(String label, String value, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label,
-            style: TextStyle(
-                color: Colors.grey[400],
-                fontSize: 10,
-                fontWeight: FontWeight.w600)),
-        const SizedBox(height: 2),
-        Text(value,
-            style: TextStyle(
-                color: color, fontSize: 13, fontWeight: FontWeight.w800)),
-      ],
     );
   }
 }
