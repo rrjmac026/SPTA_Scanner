@@ -3,6 +3,7 @@ import '../helpers/database_helper.dart';
 import 'scanner_screen.dart';
 import 'records_screen.dart';
 import 'settings_screen.dart';
+import 'add_transaction_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -113,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen>
                           ],
                         ),
                       ),
-                      // Settings button
+                      // Settings button (icon only in header)
                       GestureDetector(
                         onTap: () async {
                           await Navigator.push(
@@ -353,25 +354,26 @@ class _HomeScreenState extends State<HomeScreen>
                         Expanded(
                           child: SizedBox(
                             height: 50,
-                            child: OutlinedButton.icon(
+                            child: ElevatedButton.icon(
                               onPressed: () async {
                                 await Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                      builder: (_) => const SettingsScreen()),
+                                      builder: (_) =>
+                                          const AddTransactionScreen()),
                                 );
                                 _loadStats();
                               },
-                              icon: const Icon(Icons.settings_rounded,
+                              icon: const Icon(Icons.add_card_rounded,
                                   size: 18),
-                              label: const Text('Settings',
+                              label: const Text('Add Transaction',
                                   style: TextStyle(
-                                      fontSize: 14,
+                                      fontSize: 13,
                                       fontWeight: FontWeight.w600)),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF7C3AED),
-                                side: const BorderSide(
-                                    color: Color(0xFF7C3AED), width: 1.5),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF16A34A),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14)),
                               ),
