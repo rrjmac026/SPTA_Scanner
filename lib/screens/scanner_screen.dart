@@ -36,22 +36,43 @@ class _ScannerScreenState extends State<ScannerScreen> {
       final rawValue = barcode.rawValue;
       if (rawValue == null || rawValue.isEmpty) continue;
 
-      final lines = rawValue.trim().split('\n');
+      final normalized = rawValue.trim().replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+      final lines = normalized
+          .split('\n')
+          .map((l) => l.trim())
+          .where((l) => l.isNotEmpty)
+          .toList();
+
       String name = '';
       String lrn = '';
 
-      if (lines.length >= 2) {
-        name = lines[0].trim();
-        lrn = lines[1].trim();
-      } else {
-        final parts = rawValue.trim().split(RegExp(r'\s+'));
-        if (parts.length >= 2) {
-          lrn = parts.last;
-          name = parts.sublist(0, parts.length - 1).join(' ');
-        } else {
-          name = rawValue.trim();
+      for (final line in lines) {
+        // Match "NAME: ..." or "NAME : ..." (case-insensitive)
+        final nameMatch = RegExp(r'^name\s*:\s*(.+)$', caseSensitive: false).firstMatch(line);
+        // Match "LRN: ..." or "LRN : ..." (case-insensitive)
+        final lrnMatch = RegExp(r'^lrn\s*:\s*(.+)$', caseSensitive: false).firstMatch(line);
+
+        if (nameMatch != null) {
+          name = nameMatch.group(1)!.trim();
+        } else if (lrnMatch != null) {
+          lrn = lrnMatch.group(1)!.trim();
         }
       }
+
+      // Fallback: if labels not found, try positional parsing
+      if (name.isEmpty && lrn.isEmpty && lines.length >= 2) {
+        final line0isLrn = RegExp(r'^\d{6,}$').hasMatch(lines[0]);
+        if (line0isLrn) {
+          lrn = lines[0];
+          name = lines[1];
+        } else {
+          name = lines[0];
+          lrn = lines[1];
+        }
+      }
+
+      name = name.trim();
+      lrn = lrn.trim();
 
       if (name.isEmpty && lrn.isEmpty) continue;
 
