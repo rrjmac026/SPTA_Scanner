@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../helpers/database_helper.dart';
 import '../../models/models.dart';
 import '../../widgets/app_input_decoration.dart';
+import '../student_detail_screen.dart';
 
 /// A single student record card shown in the [RecordsScreen] list.
 class StudentCard extends StatelessWidget {
@@ -135,8 +136,10 @@ class StudentCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Text('Enter the student\'s real LRN to link this walk-in record.',
-                    style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                Text(
+                    'Enter the student\'s real LRN to link this walk-in record.',
+                    style:
+                        TextStyle(color: Colors.grey[500], fontSize: 12)),
                 const SizedBox(height: 16),
                 Text('Learner Reference Number (LRN)',
                     style: TextStyle(
@@ -148,9 +151,12 @@ class StudentCard extends StatelessWidget {
                   controller: lrnController,
                   autofocus: true,
                   keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly
+                  ],
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'LRN is required';
+                    if (v == null || v.trim().isEmpty)
+                      return 'LRN is required';
                     if (v.trim().length < 6) {
                       return 'LRN must be at least 6 digits';
                     }
@@ -191,7 +197,8 @@ class StudentCard extends StatelessWidget {
                             onPressed: isSaving
                                 ? null
                                 : () async {
-                                    if (!formKey.currentState!.validate()) {
+                                    if (!formKey.currentState!
+                                        .validate()) {
                                       return;
                                     }
                                     setSt(() => isSaving = true);
@@ -213,7 +220,8 @@ class StudentCard extends StatelessWidget {
                                                 color: Colors.white,
                                                 size: 18),
                                             SizedBox(width: 8),
-                                            Text('LRN assigned successfully!',
+                                            Text(
+                                                'LRN assigned successfully!',
                                                 style: TextStyle(
                                                     fontWeight:
                                                         FontWeight.w600)),
@@ -225,7 +233,8 @@ class StudentCard extends StatelessWidget {
                                             SnackBarBehavior.floating,
                                         shape: RoundedRectangleBorder(
                                             borderRadius:
-                                                BorderRadius.circular(12)),
+                                                BorderRadius.circular(
+                                                    12)),
                                         margin: const EdgeInsets.all(16),
                                       ));
                                     } else {
@@ -239,13 +248,16 @@ class StudentCard extends StatelessWidget {
                                             SnackBarBehavior.floating,
                                         shape: RoundedRectangleBorder(
                                             borderRadius:
-                                                BorderRadius.circular(12)),
+                                                BorderRadius.circular(
+                                                    12)),
                                         margin: const EdgeInsets.all(16),
                                       ));
                                     }
                                   },
-                            icon: const Icon(Icons.save_rounded, size: 18),
-                            label: Text(isSaving ? 'Saving...' : 'Assign LRN',
+                            icon:
+                                const Icon(Icons.save_rounded, size: 18),
+                            label: Text(
+                                isSaving ? 'Saving...' : 'Assign LRN',
                                 style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w700)),
@@ -285,228 +297,255 @@ class StudentCard extends StatelessWidget {
         ? info.payments.last.transactionNumber
         : null;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: isTemp
-            ? Border.all(
-                color: const Color(0xFFF97316).withOpacity(0.4), width: 1.5)
-            : null,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+    return GestureDetector(
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => StudentDetailScreen(info: info),
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                      color: isTemp
-                          ? const Color(0xFFFFEDD5)
-                          : const Color(0xFFF0FDF4),
-                      borderRadius: BorderRadius.circular(10)),
-                  child: Center(
-                    child: isTemp
-                        ? const Icon(Icons.no_accounts_rounded,
-                            color: Color(0xFFF97316), size: 18)
-                        : Text('${index + 1}',
+        );
+        // Refresh the list after returning in case something changed
+        onRecordChanged?.call();
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: isTemp
+              ? Border.all(
+                  color: const Color(0xFFF97316).withOpacity(0.4),
+                  width: 1.5)
+              : null,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                        color: isTemp
+                            ? const Color(0xFFFFEDD5)
+                            : const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(10)),
+                    child: Center(
+                      child: isTemp
+                          ? const Icon(Icons.no_accounts_rounded,
+                              color: Color(0xFFF97316), size: 18)
+                          : Text('${index + 1}',
+                              style: const TextStyle(
+                                  color: Color(0xFF16A34A),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(s.name,
                             style: const TextStyle(
-                                color: Color(0xFF16A34A),
-                                fontWeight: FontWeight.w800,
-                                fontSize: 13)),
+                                color: Color(0xFF14532D),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14)),
+                        const SizedBox(height: 1),
+                        if (isTemp)
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFEDD5),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.warning_amber_rounded,
+                                        color: Color(0xFFF97316), size: 9),
+                                    SizedBox(width: 3),
+                                    Text('No LRN',
+                                        style: TextStyle(
+                                            color: Color(0xFF9A3412),
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w800)),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(s.lrn,
+                                  style: const TextStyle(
+                                      color: Color(0xFF94A3B8),
+                                      fontSize: 10,
+                                      fontFamily: 'monospace')),
+                            ],
+                          )
+                        else
+                          Text('LRN: ${s.lrn}',
+                              style: const TextStyle(
+                                  color: Color(0xFF64748B),
+                                  fontSize: 11,
+                                  fontFamily: 'monospace')),
+                      ],
+                    ),
+                  ),
+                  _statusChip(info.paymentStatus),
+                  const SizedBox(width: 6),
+                  // Tap affordance arrow
+                  Icon(Icons.chevron_right_rounded,
+                      color: Colors.grey[300], size: 20),
+                ],
+              ),
+
+              const SizedBox(height: 10),
+              const Divider(height: 1),
+              const SizedBox(height: 10),
+
+              Row(
+                children: [
+                  if (s.grade.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(8)),
+                      child: Text(s.grade,
+                          style: const TextStyle(
+                              color: Color(0xFF16A34A),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700)),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(formatDate(s.createdAt),
+                      style:
+                          TextStyle(color: Colors.grey[400], fontSize: 10)),
+                ],
+              ),
+
+              // ── "Link LRN" button for temp records ─────────────────────
+              if (isTemp) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showAssignLrnSheet(context),
+                    icon: const Icon(Icons.link_rounded, size: 15),
+                    label: const Text('Assign LRN manually',
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFF97316),
+                      side: const BorderSide(
+                          color: Color(0xFFF97316), width: 1.2),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              ],
+
+              // Latest transaction number badge
+              if (latestTxn != null) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(7),
+                    border: Border.all(
+                        color:
+                            const Color(0xFF3B82F6).withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(s.name,
+                      const Icon(Icons.confirmation_number_rounded,
+                          size: 11, color: Color(0xFF3B82F6)),
+                      const SizedBox(width: 5),
+                      Text('Latest: $latestTxn',
                           style: const TextStyle(
-                              color: Color(0xFF14532D),
+                              color: Color(0xFF1D4ED8),
+                              fontSize: 10,
                               fontWeight: FontWeight.w700,
-                              fontSize: 14)),
-                      const SizedBox(height: 1),
-                      if (isTemp)
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFFEDD5),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.warning_amber_rounded,
-                                      color: Color(0xFFF97316), size: 9),
-                                  SizedBox(width: 3),
-                                  Text('No LRN',
-                                      style: TextStyle(
-                                          color: Color(0xFF9A3412),
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w800)),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(s.lrn,
-                                style: const TextStyle(
-                                    color: Color(0xFF94A3B8),
-                                    fontSize: 10,
-                                    fontFamily: 'monospace')),
-                          ],
-                        )
-                      else
-                        Text('LRN: ${s.lrn}',
-                            style: const TextStyle(
-                                color: Color(0xFF64748B),
-                                fontSize: 11,
-                                fontFamily: 'monospace')),
+                              fontFamily: 'monospace',
+                              letterSpacing: 0.4)),
                     ],
                   ),
                 ),
-                _statusChip(info.paymentStatus),
               ],
-            ),
 
-            const SizedBox(height: 10),
-            const Divider(height: 1),
-            const SizedBox(height: 10),
-
-            Row(
-              children: [
-                if (s.grade.isNotEmpty) ...[
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                        color: const Color(0xFFF0FDF4),
-                        borderRadius: BorderRadius.circular(8)),
-                    child: Text(s.grade,
-                        style: const TextStyle(
-                            color: Color(0xFF16A34A),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700)),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                Text(formatDate(s.createdAt),
-                    style: TextStyle(color: Colors.grey[400], fontSize: 10)),
-              ],
-            ),
-
-            // ── "Link LRN" button for temp records ─────────────────────────
-            if (isTemp) ...[
               const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _showAssignLrnSheet(context),
-                  icon: const Icon(Icons.link_rounded, size: 15),
-                  label: const Text('Assign LRN manually',
-                      style: TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.w600)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFF97316),
-                    side: const BorderSide(
-                        color: Color(0xFFF97316), width: 1.2),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+              Row(
+                children: [
+                  Expanded(
+                      child: _miniStat(
+                          'Total Fee',
+                          '₱${info.totalFee.toStringAsFixed(2)}',
+                          const Color(0xFF64748B))),
+                  Expanded(
+                      child: _miniStat(
+                          'Paid',
+                          '₱${info.amountPaid.toStringAsFixed(2)}',
+                          const Color(0xFF16A34A))),
+                  Expanded(
+                      child: _miniStat(
+                          'Balance',
+                          '₱${info.remainingBalance.toStringAsFixed(2)}',
+                          info.isFullyPaid
+                              ? const Color(0xFF16A34A)
+                              : const Color(0xFFDC2626))),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: pct,
+                  minHeight: 6,
+                  backgroundColor: const Color(0xFFE2E8F0),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    info.isFullyPaid
+                        ? const Color(0xFF16A34A)
+                        : const Color(0xFF4ADE80),
                   ),
                 ),
               ),
-            ],
 
-            // Latest transaction number badge
-            if (latestTxn != null) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(7),
-                  border: Border.all(
-                      color: const Color(0xFF3B82F6).withOpacity(0.3)),
+              if (info.payments.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  '${info.payments.length} payment${info.payments.length > 1 ? 's' : ''} recorded  •  Tap to view details',
+                  style: TextStyle(color: Colors.grey[400], fontSize: 10),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.confirmation_number_rounded,
-                        size: 11, color: Color(0xFF3B82F6)),
-                    const SizedBox(width: 5),
-                    Text('Latest: $latestTxn',
-                        style: const TextStyle(
-                            color: Color(0xFF1D4ED8),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            fontFamily: 'monospace',
-                            letterSpacing: 0.4)),
-                  ],
+              ] else ...[
+                const SizedBox(height: 6),
+                Text(
+                  'No payments yet  •  Tap to view details',
+                  style: TextStyle(color: Colors.grey[400], fontSize: 10),
                 ),
-              ),
-            ],
-
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                    child: _miniStat('Total Fee',
-                        '₱${info.totalFee.toStringAsFixed(2)}',
-                        const Color(0xFF64748B))),
-                Expanded(
-                    child: _miniStat('Paid',
-                        '₱${info.amountPaid.toStringAsFixed(2)}',
-                        const Color(0xFF16A34A))),
-                Expanded(
-                    child: _miniStat(
-                        'Balance',
-                        '₱${info.remainingBalance.toStringAsFixed(2)}',
-                        info.isFullyPaid
-                            ? const Color(0xFF16A34A)
-                            : const Color(0xFFDC2626))),
               ],
-            ),
-
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: pct,
-                minHeight: 6,
-                backgroundColor: const Color(0xFFE2E8F0),
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  info.isFullyPaid
-                      ? const Color(0xFF16A34A)
-                      : const Color(0xFF4ADE80),
-                ),
-              ),
-            ),
-
-            if (info.payments.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(
-                '${info.payments.length} payment${info.payments.length > 1 ? 's' : ''} recorded',
-                style: TextStyle(color: Colors.grey[400], fontSize: 10),
-              ),
             ],
-          ],
+          ),
         ),
       ),
     );
