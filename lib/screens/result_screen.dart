@@ -9,6 +9,7 @@ import 'widgets/status_banner.dart';
 import 'widgets/student_info_card.dart';
 import 'widgets/payment_summary_card.dart';
 import 'widgets/payment_history_card.dart';
+import 'widgets/link_temp_sheet.dart';
 
 class ResultScreen extends StatefulWidget {
   final String name;
@@ -26,10 +27,12 @@ class _ResultScreenState extends State<ResultScreen>
 
   bool _isLoading = true;
   bool _isSavingPayment = false;
+  bool _isLinking = false;
 
   StudentPaymentInfo? _info;
   String _selectedGrade = 'Grade 7';
   bool _isNewStudent = false;
+  bool _tempLinkChecked = false; // whether we've already checked for temp matches
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -65,6 +68,27 @@ class _ResultScreenState extends State<ResultScreen>
     setState(() => _isLoading = true);
     final info = await _db.getStudentPaymentInfo(widget.lrn);
     if (info == null) {
+      // ── New student: check for walk-in temp records first ─────────────
+      if (!_tempLinkChecked) {
+        _tempLinkChecked = true;
+        final candidates = await _db.findTempCandidates(widget.name);
+        if (candidates.isNotEmpty && mounted) {
+          setState(() => _isLoading = false);
+          // Give the UI a moment to settle before showing the sheet
+          await Future.delayed(const Duration(milliseconds: 400));
+          if (!mounted) return;
+          final chosen = await LinkTempSheet.show(
+            context,
+            scannedName: widget.name,
+            scannedLrn: widget.lrn,
+            candidates: candidates,
+          );
+          if (chosen != null && mounted) {
+            await _linkTempRecord(chosen);
+            return;
+          }
+        }
+      }
       setState(() {
         _isNewStudent = true;
         _isLoading = false;
@@ -76,6 +100,44 @@ class _ResultScreenState extends State<ResultScreen>
       _isNewStudent = false;
       _isLoading = false;
     });
+  }
+
+  Future<void> _linkTempRecord(StudentPaymentInfo chosen) async {
+    setState(() => _isLinking = true);
+    await _db.linkTempToLrn(
+      tempStudentId: chosen.student.id!,
+      realLrn: widget.lrn,
+      realName: widget.name,
+      grade: chosen.student.grade,
+    );
+    // Reload with the now-linked real LRN
+    await _loadOrCreateStudent();
+    setState(() => _isLinking = false);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.link_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Walk-in record linked to ${widget.name}!',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF16A34A),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   Future<void> _registerAndContinue() async {
@@ -104,7 +166,6 @@ class _ResultScreenState extends State<ResultScreen>
       setState(() => _isSavingPayment = true);
       final now = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
 
-      // addPayment returns the saved payment with the generated transaction number
       final savedPayment = await _db.addPayment(Payment(
         studentId: _info!.student.id!,
         amount: amt as double,
@@ -320,6 +381,36 @@ class _ResultScreenState extends State<ResultScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // ── Temp-linked banner ──────────────────────────────────────────
+          if (info.student.isTempRecord) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                    color: const Color(0xFFF97316).withOpacity(0.4)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded,
+                      color: Color(0xFFF97316), size: 20),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Walk-in record — LRN not yet linked. Ask student to present their QR code.',
+                      style: TextStyle(
+                          color: Color(0xFF9A3412),
+                          fontSize: 12,
+                          height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           StatusBanner(info: info),
           const SizedBox(height: 14),
           StudentInfoCard(
@@ -438,9 +529,20 @@ class _ResultScreenState extends State<ResultScreen>
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF16A34A)))
+      body: (_isLoading || _isLinking)
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(color: Color(0xFF16A34A)),
+                  const SizedBox(height: 16),
+                  Text(
+                    _isLinking ? 'Linking record...' : 'Loading...',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                  ),
+                ],
+              ),
+            )
           : FadeTransition(
               opacity: _fadeAnim,
               child: SlideTransition(

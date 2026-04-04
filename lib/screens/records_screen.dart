@@ -58,6 +58,9 @@ class _RecordsScreenState extends State<RecordsScreen> {
     }).toList();
   }
 
+  // Count of walk-in / unlinked temp records
+  int get _tempCount => _infos.where((i) => i.student.isTempRecord).length;
+
   Future<void> _exportExcel() async {
     setState(() => _isExporting = true);
     try {
@@ -361,6 +364,38 @@ class _RecordsScreenState extends State<RecordsScreen> {
                       'Collected',
                       Icons.payments_rounded,
                       const Color(0xFF0D9488)),
+                  // Walk-in badge
+                  if (_tempCount > 0) ...[
+                    const SizedBox(width: 8),
+                    Container(width: 1, height: 28, color: Colors.grey[200]),
+                    const SizedBox(width: 8),
+                    _statItem('$_tempCount', 'Walk-ins',
+                        Icons.no_accounts_rounded, const Color(0xFFF97316)),
+                  ],
+                ],
+              ),
+            ),
+
+          // Walk-in alert banner
+          if (!_isLoading && _tempCount > 0)
+            Container(
+              color: const Color(0xFFFFF7ED),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      color: Color(0xFFF97316), size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '$_tempCount walk-in record${_tempCount > 1 ? 's' : ''} without LRN. Ask students to scan their QR or assign LRN manually.',
+                      style: const TextStyle(
+                          color: Color(0xFF9A3412),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -405,6 +440,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
                         itemBuilder: (_, i) => StudentCard(
                           info: filtered[i],
                           index: i,
+                          onRecordChanged: _load, // refresh after LRN assigned
                         ),
                       ),
           ),

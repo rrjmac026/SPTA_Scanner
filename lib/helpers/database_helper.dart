@@ -21,7 +21,7 @@ class DatabaseHelper {
     final path = join(dir.path, 'spta_payments.db');
     return await openDatabase(
       path,
-      version: 4,
+      version: 5, // bumped from 4 → 5
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -34,7 +34,8 @@ class DatabaseHelper {
         name TEXT NOT NULL,
         lrn TEXT NOT NULL UNIQUE,
         grade TEXT NOT NULL DEFAULT '',
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        is_temp INTEGER NOT NULL DEFAULT 0
       )
     ''');
     await db.execute('''
@@ -55,8 +56,8 @@ class DatabaseHelper {
       )
     ''');
     await db.insert('settings', {'key': 'total_fee', 'value': '750'});
-    // Seed the transaction counter at 0
     await db.insert('settings', {'key': 'txn_counter', 'value': '0'});
+    await db.insert('settings', {'key': 'temp_counter', 'value': '0'});
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -95,64 +96,52 @@ class DatabaseHelper {
           }
         }
       } catch (_) {}
-      await db.insert(
-        'settings',
-        {'key': 'total_fee', 'value': '750'},
-        conflictAlgorithm: ConflictAlgorithm.ignore,
-      );
-      await db.insert(
-        'settings',
-        {'key': 'txn_counter', 'value': '0'},
-        conflictAlgorithm: ConflictAlgorithm.ignore,
-      );
+      await db.insert('settings', {'key': 'total_fee', 'value': '750'},
+          conflictAlgorithm: ConflictAlgorithm.ignore);
+      await db.insert('settings', {'key': 'txn_counter', 'value': '0'},
+          conflictAlgorithm: ConflictAlgorithm.ignore);
     }
 
     if (oldVersion < 4) {
-      // Add transaction_number column if upgrading from v3
       try {
         await db.execute(
             'ALTER TABLE payments ADD COLUMN transaction_number TEXT NOT NULL DEFAULT \'\'');
-      } catch (_) {
-        // Column may already exist if onCreate ran with v4
-      }
-      await db.insert(
-        'settings',
-        {'key': 'txn_counter', 'value': '0'},
-        conflictAlgorithm: ConflictAlgorithm.ignore,
-      );
-      // Back-fill existing rows with sequential transaction numbers
+      } catch (_) {}
+      await db.insert('settings', {'key': 'txn_counter', 'value': '0'},
+          conflictAlgorithm: ConflictAlgorithm.ignore);
       final rows = await db.query('payments', orderBy: 'id ASC');
       for (final row in rows) {
         final id = row['id'] as int;
         final existing = row['transaction_number'] as String? ?? '';
         if (existing.isEmpty) {
           final txn = await _nextTransactionNumber(db);
-          await db.update(
-            'payments',
-            {'transaction_number': txn},
-            where: 'id = ?',
-            whereArgs: [id],
-          );
+          await db.update('payments', {'transaction_number': txn},
+              where: 'id = ?', whereArgs: [id]);
         }
       }
+    }
+
+    // v5: add is_temp column and temp_counter setting
+    if (oldVersion < 5) {
+      try {
+        await db.execute(
+            'ALTER TABLE students ADD COLUMN is_temp INTEGER NOT NULL DEFAULT 0');
+      } catch (_) {}
+      await db.insert('settings', {'key': 'temp_counter', 'value': '0'},
+          conflictAlgorithm: ConflictAlgorithm.ignore);
     }
   }
 
   // ─── Transaction number generator ─────────────────────────────────────────
 
-  /// Atomically increments the counter and returns a formatted txn number.
-  /// Format: TXN-YYYYMMDD-00001
   Future<String> _nextTransactionNumber(DatabaseExecutor db) async {
-    final rows = await db.query('settings',
-        where: 'key = ?', whereArgs: ['txn_counter']);
+    final rows = await db
+        .query('settings', where: 'key = ?', whereArgs: ['txn_counter']);
     final current =
         int.tryParse(rows.isEmpty ? '0' : rows.first['value'] as String) ?? 0;
     final next = current + 1;
-    await db.insert(
-      'settings',
-      {'key': 'txn_counter', 'value': next.toString()},
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('settings', {'key': 'txn_counter', 'value': next.toString()},
+        conflictAlgorithm: ConflictAlgorithm.replace);
     final now = DateTime.now();
     final dateStr =
         '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
@@ -162,6 +151,25 @@ class DatabaseHelper {
   Future<String> generateTransactionNumber() async {
     final db = await database;
     return _nextTransactionNumber(db);
+  }
+
+  // ─── Temp LRN generator ────────────────────────────────────────────────────
+
+  /// Generates a unique temporary LRN like TEMP-000042
+  Future<String> _nextTempLrn(DatabaseExecutor db) async {
+    final rows = await db
+        .query('settings', where: 'key = ?', whereArgs: ['temp_counter']);
+    final current =
+        int.tryParse(rows.isEmpty ? '0' : rows.first['value'] as String) ?? 0;
+    final next = current + 1;
+    await db.insert('settings', {'key': 'temp_counter', 'value': next.toString()},
+        conflictAlgorithm: ConflictAlgorithm.replace);
+    return 'TEMP-${next.toString().padLeft(6, '0')}';
+  }
+
+  Future<String> generateTempLrn() async {
+    final db = await database;
+    return _nextTempLrn(db);
   }
 
   // ─── Settings ──────────────────────────────────────────────────────────────
@@ -176,11 +184,8 @@ class DatabaseHelper {
 
   Future<void> setTotalFee(double fee) async {
     final db = await database;
-    await db.insert(
-      'settings',
-      {'key': 'total_fee', 'value': fee.toString()},
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('settings', {'key': 'total_fee', 'value': fee.toString()},
+        conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   // ─── Students ──────────────────────────────────────────────────────────────
@@ -215,11 +220,120 @@ class DatabaseHelper {
     return maps.map(Student.fromMap).toList();
   }
 
+  // ─── Temp / walk-in students ───────────────────────────────────────────────
+
+  /// Returns all students that have a TEMP-* LRN (unlinked walk-ins).
+  Future<List<StudentPaymentInfo>> getUnlinkedTempStudents() async {
+    final db = await database;
+    final rows = await db.query('students',
+        where: 'is_temp = 1', orderBy: 'created_at DESC');
+    final totalFee = await getTotalFee();
+    final List<StudentPaymentInfo> result = [];
+    for (final row in rows) {
+      final s = Student.fromMap(row);
+      final payments = await getPaymentsForStudent(s.id!);
+      final amountPaid = payments.fold<double>(0, (sum, p) => sum + p.amount);
+      result.add(StudentPaymentInfo(
+          student: s, totalFee: totalFee, amountPaid: amountPaid, payments: payments));
+    }
+    return result;
+  }
+
+  /// Fuzzy-matches unlinked temp students by name against [scannedName].
+  /// Returns candidates sorted by similarity score (descending).
+  Future<List<StudentPaymentInfo>> findTempCandidates(String scannedName) async {
+    final temps = await getUnlinkedTempStudents();
+    if (temps.isEmpty) return [];
+
+    final needle = scannedName.toLowerCase().trim();
+
+    // Score each candidate: count how many words from needle appear in haystack
+    List<MapEntry<StudentPaymentInfo, int>> scored = [];
+    for (final info in temps) {
+      final haystack = info.student.name.toLowerCase();
+      final words = needle.split(RegExp(r'\s+'));
+      int score = 0;
+      for (final w in words) {
+        if (w.isNotEmpty && haystack.contains(w)) score++;
+      }
+      // Bonus: exact match
+      if (haystack == needle) score += 100;
+      if (score > 0) scored.add(MapEntry(info, score));
+    }
+
+    scored.sort((a, b) => b.value.compareTo(a.value));
+    return scored.map((e) => e.key).toList();
+  }
+
+  /// Links a temp student record to a real LRN.
+  /// Transfers all their payments to the real student (creating one if needed),
+  /// then deletes the temp record.
+  Future<bool> linkTempToLrn({
+    required int tempStudentId,
+    required String realLrn,
+    required String realName,
+    required String grade,
+  }) async {
+    final db = await database;
+
+    // Check if real LRN already exists
+    final existing =
+        await db.query('students', where: 'lrn = ?', whereArgs: [realLrn]);
+
+    int realStudentId;
+    if (existing.isNotEmpty) {
+      realStudentId = existing.first['id'] as int;
+    } else {
+      final now = DateTime.now().toIso8601String();
+      realStudentId = await db.insert('students', {
+        'name': realName,
+        'lrn': realLrn,
+        'grade': grade,
+        'created_at': now,
+        'is_temp': 0,
+      });
+    }
+
+    // Re-assign all payments from temp → real
+    await db.update(
+      'payments',
+      {'student_id': realStudentId},
+      where: 'student_id = ?',
+      whereArgs: [tempStudentId],
+    );
+
+    // Delete temp record
+    await db.delete('students', where: 'id = ?', whereArgs: [tempStudentId]);
+
+    return true;
+  }
+
+  /// Assigns a real LRN to a temp student (without merging into another record).
+  /// Used when the user types the LRN manually in the Records screen.
+  Future<bool> assignLrnToTemp({
+    required int tempStudentId,
+    required String realLrn,
+  }) async {
+    final db = await database;
+
+    // Ensure LRN is not already used
+    final conflict =
+        await db.query('students', where: 'lrn = ?', whereArgs: [realLrn]);
+    if (conflict.isNotEmpty) return false;
+
+    await db.update(
+      'students',
+      {'lrn': realLrn, 'is_temp': 0},
+      where: 'id = ?',
+      whereArgs: [tempStudentId],
+    );
+    return true;
+  }
+
   // ─── Payments ──────────────────────────────────────────────────────────────
 
   Future<Payment> addPayment(Payment payment) async {
     final db = await database;
-    // Auto-generate transaction number if not supplied
     final txn = payment.transactionNumber.isNotEmpty
         ? payment.transactionNumber
         : await _nextTransactionNumber(db);
@@ -269,11 +383,7 @@ class DatabaseHelper {
     final payments = await getPaymentsForStudent(student.id!);
     final amountPaid = payments.fold<double>(0, (s, p) => s + p.amount);
     return StudentPaymentInfo(
-      student: student,
-      totalFee: totalFee,
-      amountPaid: amountPaid,
-      payments: payments,
-    );
+        student: student, totalFee: totalFee, amountPaid: amountPaid, payments: payments);
   }
 
   Future<List<StudentPaymentInfo>> getAllStudentPaymentInfos() async {
@@ -284,19 +394,14 @@ class DatabaseHelper {
       final payments = await getPaymentsForStudent(s.id!);
       final amountPaid = payments.fold<double>(0, (sum, p) => sum + p.amount);
       result.add(StudentPaymentInfo(
-        student: s,
-        totalFee: totalFee,
-        amountPaid: amountPaid,
-        payments: payments,
-      ));
+          student: s, totalFee: totalFee, amountPaid: amountPaid, payments: payments));
     }
     return result;
   }
 
   Future<int> getTotalStudentCount() async {
     final db = await database;
-    final result =
-        await db.rawQuery('SELECT COUNT(*) as count FROM students');
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM students');
     return Sqflite.firstIntValue(result) ?? 0;
   }
 

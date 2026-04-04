@@ -29,6 +29,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
   StudentPaymentInfo? _existingInfo;
   double _totalFee = 750;
 
+  /// When true the LRN field is hidden and a TEMP-* ID is generated on submit
+  bool _noLrnMode = false;
+
   final List<String> _grades = [
     'Grade 7', 'Grade 8', 'Grade 9',
     'Grade 10', 'Grade 11', 'Grade 12',
@@ -87,10 +90,20 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     }
   }
 
+  void _toggleNoLrnMode(bool val) {
+    setState(() {
+      _noLrnMode = val;
+      // Reset LRN-dependent state when switching modes
+      _lrnController.clear();
+      _lrnExists = false;
+      _lrnChecked = false;
+      _existingInfo = null;
+    });
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final lrn = _lrnController.text.trim();
     final name = _nameController.text.trim();
     final amount = double.parse(_amountController.text.trim());
     final now = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
@@ -98,32 +111,58 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     setState(() => _isSaving = true);
 
     int studentId;
+    String lrn;
+    bool isNew;
 
-    if (_lrnExists && _existingInfo != null) {
-      final remaining = _existingInfo!.remainingBalance;
-      if (amount > remaining) {
-        setState(() => _isSaving = false);
-        _showError(
-            'Amount exceeds remaining balance of ₱${remaining.toStringAsFixed(2)}');
-        return;
-      }
-      studentId = _existingInfo!.student.id!;
-    } else {
+    if (_noLrnMode) {
+      // ── Walk-in: generate a TEMP LRN ──────────────────────────────────
+      lrn = await _db.generateTempLrn();
       final student = Student(
-          name: name, lrn: lrn, grade: _selectedGrade, createdAt: now);
+          name: name,
+          lrn: lrn,
+          grade: _selectedGrade,
+          createdAt: now,
+          isTemp: true);
       final id = await _db.insertStudent(student);
       if (id == null) {
         setState(() => _isSaving = false);
-        _showError('A student with this LRN already exists.');
+        _showError('Could not register student. Please try again.');
         return;
       }
       studentId = id;
+      isNew = true;
+    } else {
+      // ── Normal mode with LRN ──────────────────────────────────────────
+      lrn = _lrnController.text.trim();
+
+      if (_lrnExists && _existingInfo != null) {
+        final remaining = _existingInfo!.remainingBalance;
+        if (amount > remaining) {
+          setState(() => _isSaving = false);
+          _showError(
+              'Amount exceeds remaining balance of ₱${remaining.toStringAsFixed(2)}');
+          return;
+        }
+        studentId = _existingInfo!.student.id!;
+        isNew = false;
+      } else {
+        final student = Student(
+            name: name, lrn: lrn, grade: _selectedGrade, createdAt: now);
+        final id = await _db.insertStudent(student);
+        if (id == null) {
+          setState(() => _isSaving = false);
+          _showError('A student with this LRN already exists.');
+          return;
+        }
+        studentId = id;
+        isNew = true;
+      }
     }
 
     final savedPayment = await _db.addPayment(Payment(
       studentId: studentId,
       amount: amount,
-      note: 'Manual entry',
+      note: _noLrnMode ? 'Walk-in (no ID)' : 'Manual entry',
       createdAt: now,
     ));
 
@@ -135,7 +174,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
         name: name,
         lrn: lrn,
         amount: amount,
-        isNew: !_lrnExists,
+        isNew: isNew,
+        isTemp: _noLrnMode,
         isFullyPaid: updatedInfo?.isFullyPaid ?? false,
         remaining: updatedInfo?.remainingBalance ?? 0,
         transactionNumber: savedPayment.transactionNumber,
@@ -158,6 +198,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
     required String lrn,
     required double amount,
     required bool isNew,
+    required bool isTemp,
     required bool isFullyPaid,
     required double remaining,
     required String transactionNumber,
@@ -166,7 +207,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       context: context,
       backgroundColor: Colors.transparent,
       isDismissible: false,
-      // Allow the sheet to size itself taller than half-screen when needed
       isScrollControlled: true,
       builder: (sheetContext) {
         final bottomPadding = MediaQuery.of(sheetContext).viewInsets.bottom +
@@ -178,7 +218,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
             decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(24)),
-            // SingleChildScrollView prevents overflow on small screens
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(28),
               child: Column(
@@ -189,18 +228,24 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                     width: 68,
                     height: 68,
                     decoration: BoxDecoration(
-                      color: isFullyPaid
-                          ? const Color(0xFFCCFBF1)
-                          : const Color(0xFFDCFCE7),
+                      color: isTemp
+                          ? const Color(0xFFFFF7ED)
+                          : (isFullyPaid
+                              ? const Color(0xFFCCFBF1)
+                              : const Color(0xFFDCFCE7)),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Icon(
-                      isFullyPaid
-                          ? Icons.celebration_rounded
-                          : Icons.check_circle_rounded,
-                      color: isFullyPaid
-                          ? const Color(0xFF0D9488)
-                          : const Color(0xFF16A34A),
+                      isTemp
+                          ? Icons.person_search_rounded
+                          : (isFullyPaid
+                              ? Icons.celebration_rounded
+                              : Icons.check_circle_rounded),
+                      color: isTemp
+                          ? const Color(0xFFF97316)
+                          : (isFullyPaid
+                              ? const Color(0xFF0D9488)
+                              : const Color(0xFF16A34A)),
                       size: 38,
                     ),
                   ),
@@ -208,13 +253,17 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
 
                   // ── Title ───────────────────────────────────────────────
                   Text(
-                    isFullyPaid ? 'Fully Paid! 🎉' : 'Payment Recorded!',
+                    isTemp
+                        ? 'Walk-in Recorded!'
+                        : (isFullyPaid ? 'Fully Paid! 🎉' : 'Payment Recorded!'),
                     style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
-                        color: isFullyPaid
-                            ? const Color(0xFF0D9488)
-                            : const Color(0xFF16A34A)),
+                        color: isTemp
+                            ? const Color(0xFFF97316)
+                            : (isFullyPaid
+                                ? const Color(0xFF0D9488)
+                                : const Color(0xFF16A34A))),
                   ),
                   const SizedBox(height: 8),
                   Text(name,
@@ -222,11 +271,41 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF14532D))),
-                  Text('LRN: $lrn',
-                      style: TextStyle(
-                          color: Colors.grey[500], fontSize: 12)),
 
-                  // ── Transaction number ───────────────────────────────────
+                  // ── Temp badge ───────────────────────────────────────────
+                  if (isTemp) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF7ED),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: const Color(0xFFF97316).withOpacity(0.4)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.link_off_rounded,
+                              color: Color(0xFFF97316), size: 14),
+                          SizedBox(width: 6),
+                          Text(
+                            'No LRN — scan their QR later to link',
+                            style: TextStyle(
+                                color: Color(0xFF9A3412),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else
+                    Text('LRN: $lrn',
+                        style: TextStyle(
+                            color: Colors.grey[500], fontSize: 12)),
+
+                  // ── Transaction number ────────────────────────────────────
                   const SizedBox(height: 12),
                   GestureDetector(
                     onTap: () {
@@ -249,8 +328,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                         color: const Color(0xFFEFF6FF),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                            color: const Color(0xFF3B82F6)
-                                .withOpacity(0.4)),
+                            color: const Color(0xFF3B82F6).withOpacity(0.4)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -293,9 +371,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                             '₱${amount.toStringAsFixed(2)}',
                             const Color(0xFF16A34A)),
                         Container(
-                            width: 1,
-                            height: 36,
-                            color: Colors.grey[200]),
+                            width: 1, height: 36, color: Colors.grey[200]),
                         _successStat(
                             'Balance',
                             '₱${remaining.toStringAsFixed(2)}',
@@ -303,9 +379,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                                 ? const Color(0xFF16A34A)
                                 : const Color(0xFFDC2626)),
                         Container(
-                            width: 1,
-                            height: 36,
-                            color: Colors.grey[200]),
+                            width: 1, height: 36, color: Colors.grey[200]),
                         _successStat(
                             'Status',
                             isFullyPaid ? 'Paid ✓' : 'Partial',
@@ -317,7 +391,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                   ),
 
                   // ── New student badge ────────────────────────────────────
-                  if (isNew) ...[
+                  if (isNew && !isTemp) ...[
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -357,12 +431,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                             side: BorderSide(color: Colors.grey[300]!),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12)),
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 13),
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 13),
                           ),
                           child: const Text('Done',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w600)),
+                              style:
+                                  TextStyle(fontWeight: FontWeight.w600)),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -374,16 +448,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                           },
                           icon: const Icon(Icons.add_rounded, size: 18),
                           label: const Text('Add Another',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w700)),
+                              style: TextStyle(fontWeight: FontWeight.w700)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF16A34A),
                             foregroundColor: Colors.white,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12)),
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 13),
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 13),
                           ),
                         ),
                       ),
@@ -423,6 +496,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       _lrnExists = false;
       _lrnChecked = false;
       _existingInfo = null;
+      _noLrnMode = false;
     });
   }
 
@@ -508,6 +582,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // ── Info banner ────────────────────────────────────────────
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -523,7 +598,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                       SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Use this form to manually record a student\'s payment when their QR code is unavailable.',
+                          'Manually record a payment. Toggle "No LRN" if the student forgot their ID — you can link it later by scanning their QR code.',
                           style: TextStyle(
                               color: Color(0xFF166534),
                               fontSize: 12,
@@ -533,8 +608,89 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
+                // ── No LRN toggle ──────────────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: _noLrnMode
+                        ? const Color(0xFFFFF7ED)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: _noLrnMode
+                          ? const Color(0xFFF97316).withOpacity(0.5)
+                          : Colors.grey.withOpacity(0.2),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2))
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: _noLrnMode
+                              ? const Color(0xFFFFEDD5)
+                              : const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          _noLrnMode
+                              ? Icons.no_accounts_rounded
+                              : Icons.badge_rounded,
+                          color: _noLrnMode
+                              ? const Color(0xFFF97316)
+                              : const Color(0xFF16A34A),
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _noLrnMode
+                                  ? 'Walk-in mode (no ID)'
+                                  : 'Student has ID / LRN',
+                              style: TextStyle(
+                                  color: _noLrnMode
+                                      ? const Color(0xFF9A3412)
+                                      : const Color(0xFF14532D),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700),
+                            ),
+                            Text(
+                              _noLrnMode
+                                  ? 'A temp ID will be assigned. Link later via QR scan.'
+                                  : 'Toggle if student forgot their ID',
+                              style: TextStyle(
+                                  color: Colors.grey[500], fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: _noLrnMode,
+                        onChanged: _toggleNoLrnMode,
+                        activeColor: const Color(0xFFF97316),
+                        activeTrackColor:
+                            const Color(0xFFF97316).withOpacity(0.3),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // ── Student info card ──────────────────────────────────────
                 _sectionCard(
                   icon: Icons.person_rounded,
                   iconColor: const Color(0xFF16A34A),
@@ -550,6 +706,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                     existingInfo: _existingInfo,
                     amountPaid: amountPaid,
                     remaining: remaining,
+                    noLrnMode: _noLrnMode,
                     onLrnChanged: (v) {
                       if (v.length >= 6) _checkLrn(v);
                       if (v.isEmpty) {
@@ -566,6 +723,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                 ),
                 const SizedBox(height: 16),
 
+                // ── Payment details card ───────────────────────────────────
                 _sectionCard(
                   icon: Icons.payments_rounded,
                   iconColor: const Color(0xFF0D9488),
@@ -585,7 +743,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                   height: 56,
                   child: ElevatedButton.icon(
                     onPressed:
-                        (_isSaving || (_lrnExists && remaining <= 0))
+                        (_isSaving || (!_noLrnMode && _lrnExists && remaining <= 0))
                             ? null
                             : _submit,
                     icon: _isSaving
@@ -593,20 +751,23 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white))
+                                strokeWidth: 2.5, color: Colors.white))
                         : const Icon(Icons.add_card_rounded, size: 22),
                     label: Text(
                       _isSaving
                           ? 'Recording...'
-                          : (_lrnExists
-                              ? 'Record Payment'
-                              : 'Register & Record Payment'),
+                          : (_noLrnMode
+                              ? 'Record Walk-in Payment'
+                              : (_lrnExists
+                                  ? 'Record Payment'
+                                  : 'Register & Record Payment')),
                       style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w700),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF16A34A),
+                      backgroundColor: _noLrnMode
+                          ? const Color(0xFFF97316)
+                          : const Color(0xFF16A34A),
                       foregroundColor: Colors.white,
                       disabledBackgroundColor: Colors.grey[300],
                       elevation: 0,
