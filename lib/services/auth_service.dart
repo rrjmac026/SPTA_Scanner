@@ -22,10 +22,23 @@ class AuthService {
 
   Future<AuthResult> signInWithGoogle() async {
     try {
+      // Force sign out first to clear any cached bad state
+      await _googleSignIn.signOut();
+      
       final googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return AuthResult.cancelled();
+      
+      if (googleUser == null) {
+        print('>>> GSI: returned null (user cancelled or silent fail)');
+        return AuthResult.cancelled();
+      }
+
+      print('>>> GSI: got user ${googleUser.email}');
 
       final googleAuth = await googleUser.authentication;
+      
+      print('>>> GSI: accessToken=${googleAuth.accessToken != null}');
+      print('>>> GSI: idToken=${googleAuth.idToken != null}');
+
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
@@ -33,16 +46,17 @@ class AuthService {
 
       final userCredential = await _auth.signInWithCredential(credential);
       final firebaseUser = userCredential.user;
-      if (firebaseUser == null) return AuthResult.error('Sign in failed');
+      
+      if (firebaseUser == null) return AuthResult.error('Firebase user null');
 
-      // Check if user exists in Firestore
+      print('>>> GSI: Firebase user = ${firebaseUser.uid}');
+
       final doc = await _firestore
           .collection('users')
           .doc(firebaseUser.uid)
           .get();
 
       if (!doc.exists) {
-        // First ever user = admin, rest = pending
         final isFirstUser = await _isFirstUser();
         final role = isFirstUser ? UserRole.admin : UserRole.pending;
 
@@ -66,7 +80,9 @@ class AuthService {
       }
 
       return AuthResult.success(_currentUser!);
-    } catch (e) {
+    } catch (e, stack) {
+      print('>>> GSI ERROR: $e');
+      print('>>> GSI STACK: $stack');
       return AuthResult.error(e.toString());
     }
   }

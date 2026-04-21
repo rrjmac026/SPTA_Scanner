@@ -60,7 +60,7 @@ class _LoginScreenState extends State<LoginScreen>
     if (result.error != null) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Sign in failed. Please try again.';
+        _errorMessage = result.error; // shows the REAL error on screen
       });
       return;
     }
@@ -188,10 +188,12 @@ class _LoginScreenState extends State<LoginScreen>
                                     color: Color(0xFFDC2626), size: 18),
                                 const SizedBox(width: 8),
                                 Expanded(
-                                  child: Text(_errorMessage!,
-                                      style: const TextStyle(
-                                          color: Color(0xFFDC2626),
-                                          fontSize: 12)),
+                                  child: Text(
+                                    _errorMessage!,
+                                    style: const TextStyle(
+                                        color: Color(0xFFDC2626),
+                                        fontSize: 12),
+                                  ),
                                 ),
                               ],
                             ),
