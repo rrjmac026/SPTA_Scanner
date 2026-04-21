@@ -22,6 +22,10 @@ dependencies:
   # Share / open files
   share_plus: ^10.1.4
   open_filex: ^4.5.0
+  firebase_core: ^4.7.0
+  firebase_auth: ^6.4.0
+  cloud_firestore: ^6.3.0
+  google_sign_in: ^7.2.0
 
 dev_dependencies:
   flutter_test:

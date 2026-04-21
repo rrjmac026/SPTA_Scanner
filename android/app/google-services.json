@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "886271785752",
+    "project_id": "spta-scanner",
+    "storage_bucket": "spta-scanner.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:886271785752:android:03d084e971de42da043c6d",
+        "android_client_info": {
+          "package_name": "com.example.spta_scanner_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "886271785752-mstkrgjv15mjn0gpm93h0pug7dvienv7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCAniOPZnFJA4CpL725z9vMWT0_JChVH0A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "886271785752-mstkrgjv15mjn0gpm93h0pug7dvienv7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
