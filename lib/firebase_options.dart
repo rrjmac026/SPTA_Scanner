@@ -41,10 +41,10 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCAniOPZnFJA4CpL725z9vMWT0_JChVH0A',
-    appId: '1:886271785752:android:03d084e971de42da043c6d',
-    messagingSenderId: '886271785752',
-    projectId: 'spta-scanner',
-    storageBucket: 'spta-scanner.firebasestorage.app',
+    apiKey: 'AIzaSyD7bVwTfEZb_D0SiLhOwxLnBENQ5SNWpUI',
+    appId: '1:217369064132:android:b618928f1b7c3bd9400f91',
+    messagingSenderId: '217369064132',
+    projectId: 'spta-dbd0f',
+    storageBucket: 'spta-dbd0f.firebasestorage.app',
   );
 }

@@ -1,33 +1,41 @@
 {
   "project_info": {
-    "project_number": "886271785752",
-    "project_id": "spta-scanner",
-    "storage_bucket": "spta-scanner.firebasestorage.app"
+    "project_number": "217369064132",
+    "project_id": "spta-dbd0f",
+    "storage_bucket": "spta-dbd0f.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:886271785752:android:03d084e971de42da043c6d",
+        "mobilesdk_app_id": "1:217369064132:android:b618928f1b7c3bd9400f91",
         "android_client_info": {
           "package_name": "com.example.spta_scanner_app"
         }
       },
       "oauth_client": [
         {
-          "client_id": "886271785752-mstkrgjv15mjn0gpm93h0pug7dvienv7.apps.googleusercontent.com",
+          "client_id": "217369064132-boi86u9dti87l0e464m6kvjnnjqba74a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.spta_scanner_app",
+            "certificate_hash": "ef9f02868f6307feab8289176a997a17f41537ce"
+          }
+        },
+        {
+          "client_id": "217369064132-pcvbceiaqok71id70ph2vrgcous8otfh.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCAniOPZnFJA4CpL725z9vMWT0_JChVH0A"
+          "current_key": "AIzaSyD7bVwTfEZb_D0SiLhOwxLnBENQ5SNWpUI"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "886271785752-mstkrgjv15mjn0gpm93h0pug7dvienv7.apps.googleusercontent.com",
+              "client_id": "217369064132-pcvbceiaqok71id70ph2vrgcous8otfh.apps.googleusercontent.com",
               "client_type": 3
             }
           ]
