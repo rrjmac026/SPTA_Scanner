@@ -8,6 +8,7 @@ import '../settings_screen.dart';
 import '../add_transaction_screen.dart';
 import '../login_screen.dart';
 import 'manage_users_screen.dart';
+import '../../widgets/app_logo.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -100,16 +101,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                 children: [
                   Row(
                     children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(Icons.admin_panel_settings_rounded,
-                            color: Colors.white, size: 28),
-                      ),
+                      AppLogo(size: 48),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(

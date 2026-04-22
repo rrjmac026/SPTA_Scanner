@@ -4,6 +4,7 @@ import '../models/app_user.dart';
 import 'admin/admin_home_screen.dart';
 import 'teacher/teacher_home_screen.dart';
 import 'pending_screen.dart';
+import '../widgets/app_logo.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -106,18 +107,7 @@ class _LoginScreenState extends State<LoginScreen>
                   const Spacer(flex: 2),
 
                   // ── Logo ─────────────────────────────────────────────────
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(
-                          color: Colors.white.withOpacity(0.3), width: 2),
-                    ),
-                    child: const Icon(Icons.school_rounded,
-                        color: Colors.white, size: 56),
-                  ),
+                  AppLogo(size: 100),
                   const SizedBox(height: 24),
 
                   const Text(

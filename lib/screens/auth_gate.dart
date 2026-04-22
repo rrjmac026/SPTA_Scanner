@@ -6,6 +6,7 @@ import 'login_screen.dart';
 import 'pending_screen.dart';
 import 'admin/admin_home_screen.dart';
 import 'teacher/teacher_home_screen.dart';
+import '../widgets/app_logo.dart';
 
 /// Listens to Firebase auth state and routes to the correct screen.
 class AuthGate extends StatelessWidget {
@@ -81,7 +82,7 @@ class _SplashScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.school_rounded, color: Colors.white, size: 64),
+            AppLogo(size: 80),
             SizedBox(height: 16),
             Text(
               'SPTA Payment',

@@ -5,6 +5,7 @@ import '../scanner_screen.dart';
 import '../add_transaction_screen.dart';
 import '../login_screen.dart';
 import 'teacher_records_screen.dart';
+import '../../widgets/app_logo.dart';
 
 class TeacherHomeScreen extends StatefulWidget {
   const TeacherHomeScreen({super.key});
@@ -98,16 +99,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
                 children: [
                   Row(
                     children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(Icons.school_rounded,
-                            color: Colors.white, size: 28),
-                      ),
+                      AppLogo(size: 48),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
