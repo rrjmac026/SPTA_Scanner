@@ -241,7 +241,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Main scanner card
                     Container(
                       width: double.infinity,
@@ -294,7 +294,8 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
                                 const SizedBox(width: 16),
                                 const Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Scan Student ID',
@@ -328,9 +329,9 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 20),
-                    
+
                     // Action cards
                     Row(
                       children: [
@@ -367,9 +368,9 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Info card
                     Container(
                       width: double.infinity,
@@ -465,7 +466,6 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
     required VoidCallback onTap,
   }) {
     return Container(
-      height: 100,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -483,8 +483,9 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
           onTap: onTap,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(

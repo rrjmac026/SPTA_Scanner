@@ -125,7 +125,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                             Text(
                               user?.name ?? 'Admin',
                               style: const TextStyle(
-                                  color: Colors.white70, 
+                                  color: Colors.white70,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500),
                             ),
@@ -246,7 +246,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Main scanner card
                     Container(
                       width: double.infinity,
@@ -299,7 +299,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                                 const SizedBox(width: 16),
                                 const Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Scan Student ID',
@@ -333,9 +334,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 20),
-                    
+
                     // Action grid
                     Row(
                       children: [
@@ -348,8 +349,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                               await Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                      builder: (_) =>
-                                          const RecordsScreen()));
+                                      builder: (_) => const RecordsScreen()));
                               _loadStats();
                             },
                           ),
@@ -400,8 +400,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                               await Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                      builder: (_) =>
-                                          const SettingsScreen()));
+                                      builder: (_) => const SettingsScreen()));
                               _loadStats();
                             },
                           ),
@@ -478,7 +477,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
     required VoidCallback onTap,
   }) {
     return Container(
-      height: 100,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -496,8 +494,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
           onTap: onTap,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
