@@ -32,7 +32,7 @@ class AppLogo extends StatelessWidget {
           ? Clip.antiAlias
           : Clip.none,
       child: Image.asset(
-        'assets/images/app logo.png',
+        'assets/images/app_logo.png',
         width: size,
         height: size,
         fit: BoxFit.contain,
