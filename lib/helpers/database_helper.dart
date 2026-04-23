@@ -1,11 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/models.dart';
+import '../services/firestore_service.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   static Database? _database;
+  final FirestoreService _firestore = FirestoreService();
 
   factory DatabaseHelper() => _instance;
   DatabaseHelper._internal();
@@ -205,6 +208,72 @@ class DatabaseHelper {
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
+  Future<void> _syncStudentSummaryByLrn(String lrn) async {
+    try {
+      final info = await getStudentPaymentInfo(lrn);
+      if (info != null) {
+        await _firestore.upsertStudentSummary(info);
+      }
+    } catch (e, stack) {
+      debugPrint('Firestore student sync failed for $lrn: $e');
+      debugPrintStack(stackTrace: stack);
+    }
+  }
+
+  Future<void> _syncPaymentRecord({
+    required Student student,
+    required Payment payment,
+  }) async {
+    try {
+      await _firestore.upsertPayment(student: student, payment: payment);
+    } catch (e, stack) {
+      debugPrint(
+          'Firestore payment sync failed for ${payment.transactionNumber}: $e');
+      debugPrintStack(stackTrace: stack);
+    }
+  }
+
+  Future<void> _syncRelinkedStudent({
+    required String oldLrn,
+    required String newLrn,
+  }) async {
+    try {
+      final info = await getStudentPaymentInfo(newLrn);
+      if (info != null) {
+        await _firestore.relinkStudentRecords(oldLrn: oldLrn, newInfo: info);
+      }
+    } catch (e, stack) {
+      debugPrint('Firestore relink sync failed for $oldLrn -> $newLrn: $e');
+      debugPrintStack(stackTrace: stack);
+    }
+  }
+
+  Future<Student?> _getStudentById(int studentId) async {
+    final db = await database;
+    final rows =
+        await db.query('students', where: 'id = ?', whereArgs: [studentId]);
+    if (rows.isEmpty) return null;
+    return Student.fromMap(rows.first);
+  }
+
+  Future<void> syncAllToFirestore() async {
+    try {
+      final infos = await getAllStudentPaymentInfos();
+      for (final info in infos) {
+        await _firestore.upsertStudentSummary(info);
+        for (final payment in info.payments) {
+          await _firestore.upsertPayment(
+            student: info.student,
+            payment: payment,
+          );
+        }
+      }
+    } catch (e, stack) {
+      debugPrint('Firestore full sync failed: $e');
+      debugPrintStack(stackTrace: stack);
+    }
+  }
+
   // ─── Students ──────────────────────────────────────────────────────────────
 
   Future<int?> insertStudent(Student student) async {
@@ -212,7 +281,9 @@ class DatabaseHelper {
     final existing =
         await db.query('students', where: 'lrn = ?', whereArgs: [student.lrn]);
     if (existing.isNotEmpty) return null;
-    return await db.insert('students', student.toMap());
+    final id = await db.insert('students', student.toMap());
+    await _syncStudentSummaryByLrn(student.lrn);
+    return id;
   }
 
   Future<Student?> getStudentByLrn(String lrn) async {
@@ -285,6 +356,10 @@ class DatabaseHelper {
     required String grade,
   }) async {
     final db = await database;
+    final tempRows =
+        await db.query('students', where: 'id = ?', whereArgs: [tempStudentId]);
+    final tempStudent =
+        tempRows.isEmpty ? null : Student.fromMap(tempRows.first);
     final existing =
         await db.query('students', where: 'lrn = ?', whereArgs: [realLrn]);
 
@@ -310,6 +385,10 @@ class DatabaseHelper {
     );
     await db.delete('students',
         where: 'id = ?', whereArgs: [tempStudentId]);
+    await _syncStudentSummaryByLrn(realLrn);
+    if (tempStudent != null) {
+      await _syncRelinkedStudent(oldLrn: tempStudent.lrn, newLrn: realLrn);
+    }
     return true;
   }
 
@@ -318,6 +397,10 @@ class DatabaseHelper {
     required String realLrn,
   }) async {
     final db = await database;
+    final tempRows =
+        await db.query('students', where: 'id = ?', whereArgs: [tempStudentId]);
+    final tempStudent =
+        tempRows.isEmpty ? null : Student.fromMap(tempRows.first);
     final conflict =
         await db.query('students', where: 'lrn = ?', whereArgs: [realLrn]);
     if (conflict.isNotEmpty) return false;
@@ -327,6 +410,10 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [tempStudentId],
     );
+    await _syncStudentSummaryByLrn(realLrn);
+    if (tempStudent != null) {
+      await _syncRelinkedStudent(oldLrn: tempStudent.lrn, newLrn: realLrn);
+    }
     return true;
   }
 
@@ -347,7 +434,7 @@ class DatabaseHelper {
       processedByName: payment.processedByName,
     );
     final id = await db.insert('payments', withTxn.toMap());
-    return Payment(
+    final savedPayment = Payment(
       id: id,
       studentId: withTxn.studentId,
       amount: withTxn.amount,
@@ -357,6 +444,12 @@ class DatabaseHelper {
       processedByUid: withTxn.processedByUid,
       processedByName: withTxn.processedByName,
     );
+    final student = await _getStudentById(savedPayment.studentId);
+    if (student != null) {
+      await _syncPaymentRecord(student: student, payment: savedPayment);
+      await _syncStudentSummaryByLrn(student.lrn);
+    }
+    return savedPayment;
   }
 
   Future<List<Payment>> getPaymentsForStudent(int studentId) async {

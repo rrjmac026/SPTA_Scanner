@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../helpers/database_helper.dart';
 import '../services/auth_service.dart';
 import '../models/app_user.dart';
 import 'login_screen.dart';
@@ -50,6 +52,7 @@ class _RoleRouterState extends State<_RoleRouter> {
 
   Future<void> _loadUser() async {
     await AuthService().reloadUser();
+    unawaited(DatabaseHelper().syncAllToFirestore());
     if (mounted) setState(() => _loading = false);
   }
 

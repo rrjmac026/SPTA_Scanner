@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../helpers/database_helper.dart';
 import '../models/models.dart';
+import '../services/auth_service.dart';
 import 'scanner_screen.dart';
 import 'widgets/payment_dialog.dart';
 import 'widgets/status_banner.dart';
@@ -24,6 +25,7 @@ class ResultScreen extends StatefulWidget {
 class _ResultScreenState extends State<ResultScreen>
     with SingleTickerProviderStateMixin {
   final DatabaseHelper _db = DatabaseHelper();
+  final AuthService _auth = AuthService();
 
   bool _isLoading = true;
   bool _isSavingPayment = false;
@@ -183,6 +185,8 @@ class _ResultScreenState extends State<ResultScreen>
         studentId: _info!.student.id!,
         amount: amt as double,
         createdAt: now,
+        processedByUid: _auth.currentUser?.uid ?? '',
+        processedByName: _auth.currentUser?.name ?? '',
       ));
 
       await _loadOrCreateStudent();
