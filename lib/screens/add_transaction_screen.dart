@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../helpers/database_helper.dart';
 import '../models/models.dart';
-import '../services/auth_service.dart';
 import 'widgets/student_info_form.dart';
 import 'widgets/payment_details_form.dart';
 
@@ -17,7 +16,6 @@ class AddTransactionScreen extends StatefulWidget {
 class _AddTransactionScreenState extends State<AddTransactionScreen>
     with SingleTickerProviderStateMixin {
   final DatabaseHelper _db = DatabaseHelper();
-  final AuthService _auth = AuthService();
   final _formKey = GlobalKey<FormState>();
 
   final _nameController = TextEditingController();
@@ -166,8 +164,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       amount: amount,
       note: _noLrnMode ? 'Walk-in (no ID)' : 'Manual entry',
       createdAt: now,
-      processedByUid: _auth.currentUser?.uid ?? '',
-      processedByName: _auth.currentUser?.name ?? '',
     ));
 
     final updatedInfo = await _db.getStudentPaymentInfo(lrn);
