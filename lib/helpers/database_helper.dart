@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/models.dart';
+import '../services/firestore_sync_service.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -212,7 +213,20 @@ class DatabaseHelper {
     final existing =
         await db.query('students', where: 'lrn = ?', whereArgs: [student.lrn]);
     if (existing.isNotEmpty) return null;
-    return await db.insert('students', student.toMap());
+    final id = await db.insert('students', student.toMap());
+    
+    // ← ADD THIS: sync to Firestore
+    final inserted = Student(
+      id: id,
+      name: student.name,
+      lrn: student.lrn,
+      grade: student.grade,
+      createdAt: student.createdAt,
+      isTemp: student.isTemp,
+    );
+    FirestoreSyncService().upsertStudent(inserted); // fire-and-forget
+    
+    return id;
   }
 
   Future<Student?> getStudentByLrn(String lrn) async {
@@ -347,7 +361,7 @@ class DatabaseHelper {
       processedByName: payment.processedByName,
     );
     final id = await db.insert('payments', withTxn.toMap());
-    return Payment(
+    final saved = Payment(
       id: id,
       studentId: withTxn.studentId,
       amount: withTxn.amount,
@@ -357,6 +371,10 @@ class DatabaseHelper {
       processedByUid: withTxn.processedByUid,
       processedByName: withTxn.processedByName,
     );
+
+    FirestoreSyncService().upsertPayment(saved); // fire-and-forget
+
+    return saved;
   }
 
   Future<List<Payment>> getPaymentsForStudent(int studentId) async {
