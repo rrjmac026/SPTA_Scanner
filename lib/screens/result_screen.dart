@@ -10,6 +10,7 @@ import 'widgets/student_info_card.dart';
 import 'widgets/payment_summary_card.dart';
 import 'widgets/payment_history_card.dart';
 import 'widgets/link_temp_sheet.dart';
+import '../services/auth_service.dart';
 
 class ResultScreen extends StatefulWidget {
   final String name;
@@ -179,10 +180,13 @@ class _ResultScreenState extends State<ResultScreen>
       setState(() => _isSavingPayment = true);
       final now = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
 
+      final currentUser = AuthService().currentUser;
       final savedPayment = await _db.addPayment(Payment(
         studentId: _info!.student.id!,
         amount: amt as double,
         createdAt: now,
+        processedByUid: currentUser?.uid ?? '',
+        processedByName: currentUser?.name ?? '',
       ));
 
       await _loadOrCreateStudent();

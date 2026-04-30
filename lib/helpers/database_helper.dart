@@ -38,6 +38,11 @@ class DatabaseHelper {
         created_at TEXT NOT NULL,
         is_temp INTEGER NOT NULL DEFAULT 0
       )
+      CREATE TABLE pending_sync (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        payment_id INTEGER NOT NULL,
+        synced INTEGER NOT NULL DEFAULT 0
+      )
     ''');
     await db.execute('''
       CREATE TABLE payments (

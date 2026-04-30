@@ -5,6 +5,7 @@ import '../helpers/database_helper.dart';
 import '../models/models.dart';
 import 'widgets/student_info_form.dart';
 import 'widgets/payment_details_form.dart';
+import '../services/auth_service.dart';
 
 class AddTransactionScreen extends StatefulWidget {
   const AddTransactionScreen({super.key});
@@ -159,12 +160,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       }
     }
 
-    final savedPayment = await _db.addPayment(Payment(
-      studentId: studentId,
-      amount: amount,
-      note: _noLrnMode ? 'Walk-in (no ID)' : 'Manual entry',
-      createdAt: now,
-    ));
+    final currentUser = AuthService().currentUser;
+final savedPayment = await _db.addPayment(Payment(
+  studentId: studentId,
+  amount: amount,
+  note: _noLrnMode ? 'Walk-in (no ID)' : 'Manual entry',
+  createdAt: now,
+  processedByUid: currentUser?.uid ?? '',
+  processedByName: currentUser?.name ?? '',
+));
 
     final updatedInfo = await _db.getStudentPaymentInfo(lrn);
     setState(() => _isSaving = false);
