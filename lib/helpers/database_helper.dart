@@ -3,6 +3,7 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/models.dart';
 import '../services/firestore_sync_service.dart';
+import '../models/audit_log.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -661,17 +662,18 @@ class DatabaseHelper {
     };
   }
 
-  /// Fetch all audit logs — newest first. Admin use.
-  Future<List<AuditLog>> getAllAuditLogs(Database db) async {
+  // AFTER
+  Future<List<AuditLog>> getAllAuditLogs() async {
+    final db = await database;
     final rows = await db.query(
       'audit_logs',
       orderBy: 'created_at DESC',
     );
     return rows.map(AuditLog.fromMap).toList();
   }
-  
-  /// Fetch audit logs for a specific user (teacher self-view).
-  Future<List<AuditLog>> getAuditLogsByUser(Database db, String uid) async {
+
+  Future<List<AuditLog>> getAuditLogsByUser(String uid) async {
+    final db = await database;
     final rows = await db.query(
       'audit_logs',
       where: 'processed_by_uid = ?',
@@ -680,9 +682,9 @@ class DatabaseHelper {
     );
     return rows.map(AuditLog.fromMap).toList();
   }
-  
-  /// Fetch unsynced audit logs for Firestore upload.
-  Future<List<AuditLog>> getUnsyncedAuditLogs(Database db) async {
+
+  Future<List<AuditLog>> getUnsyncedAuditLogs() async {
+    final db = await database;
     final rows = await db.query(
       'audit_logs',
       where: 'synced = 0',
@@ -690,9 +692,9 @@ class DatabaseHelper {
     );
     return rows.map(AuditLog.fromMap).toList();
   }
-  
-  /// Mark an audit log as synced to Firestore.
-  Future<void> markAuditLogSynced(Database db, int id) async {
+
+  Future<void> markAuditLogSynced(int id) async {
+    final db = await database;
     await db.update(
       'audit_logs',
       {'synced': 1},
@@ -704,7 +706,6 @@ class DatabaseHelper {
   /// Edit a payment's amount (keeps old record, writes audit log atomically).
   /// Returns the audit log id on success, or null on failure.
   Future<int?> editPaymentAmount({
-    required Database db,
     required int paymentId,
     required double oldAmount,
     required double newAmount,
@@ -713,6 +714,7 @@ class DatabaseHelper {
     required String processedByName,
     required String now,
   }) async {
+    final db = await database;
     return await db.transaction((txn) async {
       // 1. Update the payment record
       final updated = await txn.update(
