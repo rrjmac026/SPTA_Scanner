@@ -23,7 +23,7 @@ class DatabaseHelper {
     final path = join(dir.path, 'spta_payments.db');
     return await openDatabase(
       path,
-      version: 7, // bumped from 6 → 7
+      version: 8, // bumped from 6 → 7
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -55,6 +55,23 @@ class DatabaseHelper {
         processed_by_name TEXT NOT NULL DEFAULT '',
         synced INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (student_id) REFERENCES students(id)
+      )
+    ''');
+
+    // Audit log table
+    await db.execute('''
+      CREATE TABLE audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        action TEXT NOT NULL,
+        target_type TEXT NOT NULL,
+        target_id INTEGER,
+        old_value TEXT,
+        new_value TEXT,
+        reason TEXT,
+        processed_by_uid TEXT NOT NULL DEFAULT '',
+        processed_by_name TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        synced INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
@@ -187,6 +204,24 @@ class DatabaseHelper {
       try {
         await db.execute('UPDATE payments SET synced = 0');
       } catch (_) {}
+    }
+
+    if (oldVersion < 8) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS audit_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          action TEXT NOT NULL,
+          target_type TEXT NOT NULL,
+          target_id INTEGER,
+          old_value TEXT,
+          new_value TEXT,
+          reason TEXT,
+          processed_by_uid TEXT NOT NULL DEFAULT '',
+          processed_by_name TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          synced INTEGER NOT NULL DEFAULT 0
+        )
+      ''');
     }
   }
 
