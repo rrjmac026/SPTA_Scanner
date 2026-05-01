@@ -9,6 +9,7 @@ import '../add_transaction_screen.dart';
 import '../login_screen.dart';
 import 'manage_users_screen.dart';
 import '../../widgets/app_logo.dart';
+import '../audit_log_screens.dart'; // <-- add this import
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -329,7 +330,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
 
                     const SizedBox(height: 20),
 
-                    // Action grid
+                    // ── Row 1: All Records + Add Transaction ────────────────
                     Row(
                       children: [
                         Expanded(
@@ -364,7 +365,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                         ),
                       ],
                     ),
+
                     const SizedBox(height: 12),
+
+                    // ── Row 2: Manage Users + Settings ──────────────────────
                     Row(
                       children: [
                         Expanded(
@@ -398,6 +402,23 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                           ),
                         ),
                       ],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // ── Row 3: Audit Log (full width, accented) ─────────────
+                    _modernActionCard(
+                      icon: Icons.admin_panel_settings_rounded,
+                      label: 'Audit Log',
+                      color: const Color(0xFFB45309),
+                      fullWidth: true,
+                      onTap: () {
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                    const AdminAuditLogScreen()));
+                      },
                     ),
                   ],
                 ),
@@ -467,8 +488,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
     required String label,
     required Color color,
     required VoidCallback onTap,
+    bool fullWidth = false,
   }) {
     return Container(
+      width: fullWidth ? double.infinity : null,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -486,32 +509,60 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
           onTap: onTap,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+            padding: fullWidth
+                ? const EdgeInsets.symmetric(vertical: 14, horizontal: 20)
+                : const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+            child: fullWidth
+                ? Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(icon, color: color, size: 22),
+                      ),
+                      const SizedBox(width: 14),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(Icons.arrow_forward_ios_rounded,
+                          color: color.withOpacity(0.5), size: 14),
+                    ],
+                  )
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(icon, color: color, size: 24),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        label,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
-                  child: Icon(icon, color: color, size: 24),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ),

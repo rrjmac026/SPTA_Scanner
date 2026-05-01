@@ -6,7 +6,7 @@ import '../add_transaction_screen.dart';
 import '../login_screen.dart';
 import 'teacher_records_screen.dart';
 import '../../widgets/app_logo.dart';
-import '../../widgets/sync_status_badge.dart'; // ← ADD THIS IMPORT
+import '../audit_log_screens.dart'; // <-- add this import
 
 class TeacherHomeScreen extends StatefulWidget {
   const TeacherHomeScreen({super.key});
@@ -124,15 +124,6 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
                           ],
                         ),
                       ),
-
-                      // ── Sync badge ────────────────────────────────────────
-                      // Shows cloud_done (green) when everything is uploaded,
-                      // or an orange cloud with a red count badge when payments
-                      // are queued offline. Tap it to force-upload immediately.
-                      const SyncStatusBadge(),
-                      const SizedBox(width: 4),
-
-                      // ── Sign-out button ───────────────────────────────────
                       GestureDetector(
                         onTap: _signOut,
                         child: Container(
@@ -334,7 +325,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
 
                     const SizedBox(height: 20),
 
-                    // Action cards
+                    // ── Row 1: My Records + Add Transaction ─────────────────
                     Row(
                       children: [
                         Expanded(
@@ -369,6 +360,23 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
                           ),
                         ),
                       ],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // ── Row 2: Activity Log (full width) ────────────────────
+                    _modernActionCard(
+                      icon: Icons.history_rounded,
+                      label: 'My Activity Log',
+                      color: const Color(0xFF0369A1),
+                      fullWidth: true,
+                      onTap: () {
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                    const TeacherAuditLogScreen()));
+                      },
                     ),
 
                     const SizedBox(height: 24),
@@ -466,8 +474,10 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
     required String label,
     required Color color,
     required VoidCallback onTap,
+    bool fullWidth = false,
   }) {
-    return Container(
+    final content = Container(
+      width: fullWidth ? double.infinity : null,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -485,35 +495,65 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
           onTap: onTap,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+            padding: fullWidth
+                ? const EdgeInsets.symmetric(vertical: 14, horizontal: 20)
+                : const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+            child: fullWidth
+                ? Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(icon, color: color, size: 22),
+                      ),
+                      const SizedBox(width: 14),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(Icons.arrow_forward_ios_rounded,
+                          color: color.withOpacity(0.5), size: 14),
+                    ],
+                  )
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(icon, color: color, size: 24),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        label,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
-                  child: Icon(icon, color: color, size: 24),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ),
     );
+
+    return content;
   }
 }
