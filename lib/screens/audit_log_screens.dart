@@ -656,8 +656,10 @@ class _AuditLogCard extends StatelessWidget {
                       Row(
                         children: [
                           if (log.oldValue != null)
-                            _Pill(label: 'Before', value: log.oldValue!,
-                                color: const Color(0xFFDC2626)),
+                            Expanded(
+                              child: _Pill(label: 'Before', value: log.oldValue!,
+                                  color: const Color(0xFFDC2626)),
+                            ),
                           if (log.oldValue != null && log.newValue != null)
                             const Padding(
                               padding: EdgeInsets.symmetric(horizontal: 6),
@@ -665,8 +667,10 @@ class _AuditLogCard extends StatelessWidget {
                                   size: 14, color: Color(0xFF9CA3AF)),
                             ),
                           if (log.newValue != null)
-                            _Pill(label: 'After', value: log.newValue!,
-                                color: const Color(0xFF16A34A)),
+                            Expanded(
+                              child: _Pill(label: 'After', value: log.newValue!,
+                                  color: const Color(0xFF16A34A)),
+                            ),
                         ],
                       ),
                     ],
@@ -737,6 +741,7 @@ class _Pill extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(label,
               style: TextStyle(
@@ -744,6 +749,8 @@ class _Pill extends StatelessWidget {
                   color: color.withOpacity(0.8),
                   fontWeight: FontWeight.w600)),
           Text(value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                   fontSize: 13,
                   color: color,
