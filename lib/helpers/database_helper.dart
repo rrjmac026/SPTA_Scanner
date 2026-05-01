@@ -283,12 +283,31 @@ class DatabaseHelper {
 
   // ─── Students ──────────────────────────────────────────────────────────────
 
-  Future<int?> insertStudent(Student student) async {
+  Future<int?> insertStudent(
+    Student student, {
+    String processedByUid = '',
+    String processedByName = '',
+  }) async {
     final db = await database;
     final existing =
         await db.query('students', where: 'lrn = ?', whereArgs: [student.lrn]);
     if (existing.isNotEmpty) return null;
-    final id = await db.insert('students', student.toMap());
+
+    late final int id;
+    await db.transaction((txn) async {
+      id = await txn.insert('students', student.toMap());
+
+      await txn.insert('audit_logs', AuditLog(
+        action: AuditAction.studentRegistered,
+        targetType: 'student',
+        targetId: id,
+        newValue: '${student.name} (${student.lrn})',
+        processedByUid: processedByUid,
+        processedByName: processedByName,
+        createdAt: student.createdAt,
+        synced: false,
+      ).toMap());
+    });
 
     final inserted = Student(
       id: id,
@@ -298,7 +317,7 @@ class DatabaseHelper {
       createdAt: student.createdAt,
       isTemp: student.isTemp,
     );
-    FirestoreSyncService().upsertStudent(inserted); // fire-and-forget
+    FirestoreSyncService().upsertStudent(inserted);
 
     return id;
   }
@@ -437,17 +456,39 @@ class DatabaseHelper {
     );
 
     final map = withTxn.toMap();
-    map['synced'] = 0; // ensure unsynced on insert
-    final id = await db.insert('payments', map);
+    map['synced'] = 0;
 
-    // Add to pending_sync queue
-    await db.insert(
-      'pending_sync',
-      {'payment_id': id, 'synced': 0},
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
+    late final int id;
+    late final Payment saved;
 
-    final saved = Payment(
+    // Write payment + audit log atomically
+    await db.transaction((txnDb) async {
+      id = await txnDb.insert('payments', map);
+
+      // Queue for Firestore sync
+      await txnDb.insert(
+        'pending_sync',
+        {'payment_id': id, 'synced': 0},
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+
+      // ── Audit log entry ──────────────────────────────────────────────────
+      final log = AuditLog(
+        action: AuditAction.paymentAdded,
+        targetType: 'payment',
+        targetId: id,
+        oldValue: null,
+        newValue: '₱${withTxn.amount.toStringAsFixed(2)}',
+        reason: withTxn.note.isNotEmpty ? withTxn.note : null,
+        processedByUid: withTxn.processedByUid,
+        processedByName: withTxn.processedByName,
+        createdAt: withTxn.createdAt,
+        synced: false,
+      );
+      await txnDb.insert('audit_logs', log.toMap());
+    });
+
+    saved = Payment(
       id: id,
       studentId: withTxn.studentId,
       amount: withTxn.amount,
@@ -459,7 +500,7 @@ class DatabaseHelper {
       synced: false,
     );
 
-    // Attempt immediate sync; if offline the SDK queues it
+    // Attempt immediate Firestore sync
     FirestoreSyncService().upsertPayment(saved, onSynced: () async {
       await markPaymentSynced(id);
     });

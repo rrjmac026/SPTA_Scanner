@@ -111,6 +111,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
 
     setState(() => _isSaving = true);
 
+    // ── Move currentUser UP here so both branches can use it ──────────────
+    final currentUser = AuthService().currentUser;
+
     int studentId;
     String lrn;
     bool isNew;
@@ -124,7 +127,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
           grade: _selectedGrade,
           createdAt: now,
           isTemp: true);
-      final id = await _db.insertStudent(student);
+
+      // ── Walk-in path: pass currentUser ────────────────────────────────
+      final id = await _db.insertStudent(
+        student,
+        processedByUid: currentUser?.uid ?? '',
+        processedByName: currentUser?.name ?? '',
+      );
+
       if (id == null) {
         setState(() => _isSaving = false);
         _showError('Could not register student. Please try again.');
@@ -149,7 +159,14 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       } else {
         final student = Student(
             name: name, lrn: lrn, grade: _selectedGrade, createdAt: now);
-        final id = await _db.insertStudent(student);
+
+        // ── New student path: pass currentUser ───────────────────────────
+        final id = await _db.insertStudent(
+          student,
+          processedByUid: currentUser?.uid ?? '',
+          processedByName: currentUser?.name ?? '',
+        );
+
         if (id == null) {
           setState(() => _isSaving = false);
           _showError('A student with this LRN already exists.');
@@ -160,15 +177,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen>
       }
     }
 
-    final currentUser = AuthService().currentUser;
-final savedPayment = await _db.addPayment(Payment(
-  studentId: studentId,
-  amount: amount,
-  note: _noLrnMode ? 'Walk-in (no ID)' : 'Manual entry',
-  createdAt: now,
-  processedByUid: currentUser?.uid ?? '',
-  processedByName: currentUser?.name ?? '',
-));
+    // ── currentUser already declared above, remove the old line here ──────
+    final savedPayment = await _db.addPayment(Payment(
+      studentId: studentId,
+      amount: amount,
+      note: _noLrnMode ? 'Walk-in (no ID)' : 'Manual entry',
+      createdAt: now,
+      processedByUid: currentUser?.uid ?? '',
+      processedByName: currentUser?.name ?? '',
+    ));
 
     final updatedInfo = await _db.getStudentPaymentInfo(lrn);
     setState(() => _isSaving = false);
