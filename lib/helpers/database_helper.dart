@@ -660,4 +660,84 @@ class DatabaseHelper {
         row['grade'] as String: row['count'] as int
     };
   }
+
+  /// Fetch all audit logs — newest first. Admin use.
+  Future<List<AuditLog>> getAllAuditLogs(Database db) async {
+    final rows = await db.query(
+      'audit_logs',
+      orderBy: 'created_at DESC',
+    );
+    return rows.map(AuditLog.fromMap).toList();
+  }
+  
+  /// Fetch audit logs for a specific user (teacher self-view).
+  Future<List<AuditLog>> getAuditLogsByUser(Database db, String uid) async {
+    final rows = await db.query(
+      'audit_logs',
+      where: 'processed_by_uid = ?',
+      whereArgs: [uid],
+      orderBy: 'created_at DESC',
+    );
+    return rows.map(AuditLog.fromMap).toList();
+  }
+  
+  /// Fetch unsynced audit logs for Firestore upload.
+  Future<List<AuditLog>> getUnsyncedAuditLogs(Database db) async {
+    final rows = await db.query(
+      'audit_logs',
+      where: 'synced = 0',
+      orderBy: 'created_at ASC',
+    );
+    return rows.map(AuditLog.fromMap).toList();
+  }
+  
+  /// Mark an audit log as synced to Firestore.
+  Future<void> markAuditLogSynced(Database db, int id) async {
+    await db.update(
+      'audit_logs',
+      {'synced': 1},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+  
+  /// Edit a payment's amount (keeps old record, writes audit log atomically).
+  /// Returns the audit log id on success, or null on failure.
+  Future<int?> editPaymentAmount({
+    required Database db,
+    required int paymentId,
+    required double oldAmount,
+    required double newAmount,
+    required String reason,
+    required String processedByUid,
+    required String processedByName,
+    required String now,
+  }) async {
+    return await db.transaction((txn) async {
+      // 1. Update the payment record
+      final updated = await txn.update(
+        'payments',
+        {'amount': newAmount},
+        where: 'id = ?',
+        whereArgs: [paymentId],
+      );
+      if (updated == 0) return null;
+  
+      // 2. Write the immutable audit entry
+      final log = AuditLog(
+        action: AuditAction.paymentEdited,
+        targetType: 'payment',
+        targetId: paymentId,
+        oldValue: '₱${oldAmount.toStringAsFixed(2)}',
+        newValue: '₱${newAmount.toStringAsFixed(2)}',
+        reason: reason.trim().isEmpty ? null : reason.trim(),
+        processedByUid: processedByUid,
+        processedByName: processedByName,
+        createdAt: now,
+        synced: false,
+      );
+      final logId = await txn.insert('audit_logs', log.toMap());
+      return logId;
+    });
+  }
 }
