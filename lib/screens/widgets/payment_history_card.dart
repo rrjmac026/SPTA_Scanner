@@ -2,12 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../models/payment.dart';
+import '../../models/student.dart';
 
 /// Scrollable list of individual payment entries shown in [ResultScreen].
 class PaymentHistoryCard extends StatelessWidget {
   final List<Payment> payments;
+  final Student student;
+  final double totalFee;
+  final VoidCallback onEdited;
 
-  const PaymentHistoryCard({super.key, required this.payments});
+  const PaymentHistoryCard({
+    super.key,
+    required this.payments,
+    required this.student,
+    required this.totalFee,
+    required this.onEdited,
+  });
 
   static String _formatDate(String dateStr) {
     try {

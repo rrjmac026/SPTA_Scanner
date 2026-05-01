@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../helpers/database_helper.dart';
 import '../models/models.dart';
+import '../models/app_user.dart';
+import '../services/auth_service.dart';
+import 'edit_payment_sheet.dart';
 
 class StudentDetailScreen extends StatefulWidget {
   final StudentPaymentInfo info;
@@ -54,6 +57,17 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
     } catch (_) {
       return dateStr;
     }
+  }
+
+  // ── Role check ────────────────────────────────────────────────────────────
+  bool _canEdit(Payment p) {
+    final user = AuthService().currentUser;
+    if (user == null) return false;
+    if (user.role == UserRole.admin) return true;
+    if (user.role == UserRole.teacher) {
+      return p.processedByUid == user.uid;
+    }
+    return false;
   }
 
   Color get _statusColor {
@@ -122,7 +136,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
                       children: [
                         Row(
                           children: [
-                            // Avatar
                             Container(
                               width: 56,
                               height: 56,
@@ -164,8 +177,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
                                           padding: const EdgeInsets.symmetric(
                                               horizontal: 8, vertical: 3),
                                           decoration: BoxDecoration(
-                                            color:
-                                                Colors.white.withOpacity(0.2),
+                                            color: Colors.white.withOpacity(0.2),
                                             borderRadius:
                                                 BorderRadius.circular(8),
                                           ),
@@ -214,7 +226,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
                                 ],
                               ),
                             ),
-                            // Status badge
                             Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 10, vertical: 6),
@@ -239,7 +250,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
                           ],
                         ),
                         const SizedBox(height: 14),
-                        // Progress bar in header
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -266,8 +276,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
                               child: LinearProgressIndicator(
                                 value: pct,
                                 minHeight: 8,
-                                backgroundColor:
-                                    Colors.white.withOpacity(0.25),
+                                backgroundColor: Colors.white.withOpacity(0.25),
                                 valueColor: AlwaysStoppedAnimation<Color>(
                                   _info.isFullyPaid
                                       ? const Color(0xFF4ADE80)
@@ -296,7 +305,6 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // ── Payment stats row ──────────────────────────────
                       Row(
                         children: [
                           Expanded(
@@ -311,8 +319,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
                           Expanded(
                               child: _statCard(
                             label: 'Amount Paid',
-                            value:
-                                '₱${_info.amountPaid.toStringAsFixed(2)}',
+                            value: '₱${_info.amountPaid.toStringAsFixed(2)}',
                             icon: Icons.payments_rounded,
                             color: const Color(0xFF16A34A),
                             bg: const Color(0xFFDCFCE7),
@@ -336,12 +343,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
                         ],
                       ),
                       const SizedBox(height: 16),
-
-                      // ── Student info card ──────────────────────────────
                       _infoCard(s),
                       const SizedBox(height: 16),
-
-                      // ── Payment history ────────────────────────────────
                       _paymentHistorySection(),
                     ],
                   ),
@@ -443,8 +446,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
             _detailRow(Icons.school_rounded, 'Grade', s.grade),
           ],
           const SizedBox(height: 10),
-          _detailRow(
-              Icons.calendar_today_rounded, 'Registered', _formatDate(s.createdAt)),
+          _detailRow(Icons.calendar_today_rounded, 'Registered',
+              _formatDate(s.createdAt)),
           const SizedBox(height: 10),
           _detailRow(
               Icons.receipt_long_rounded,
@@ -526,6 +529,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
       ),
       child: Column(
         children: [
+          // ── Section header ───────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: Row(
@@ -540,8 +544,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
                       color: Color(0xFF16A34A), size: 16),
                 ),
                 const SizedBox(width: 10),
-                Text(
-                    'Payment History (${_info.payments.length})',
+                Text('Payment History (${_info.payments.length})',
                     style: const TextStyle(
                         color: Color(0xFF14532D),
                         fontSize: 14,
@@ -566,13 +569,15 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
             ),
           ),
           const Divider(height: 1),
-          // Payments list — newest first
+
+          // ── Payment rows — newest first ───────────────────────────────
           ...(_info.payments.reversed.toList().asMap().entries.map((entry) {
             final i = entry.key;
             final p = entry.value;
-            final realIndex = _info.payments.length - i; // display number
+            final realIndex = _info.payments.length - i;
             final isLast = i == _info.payments.length - 1;
             final hasTxn = p.transactionNumber.isNotEmpty;
+            final canEdit = _canEdit(p);
 
             return Column(
               children: [
@@ -583,8 +588,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
                               ClipboardData(text: p.transactionNumber));
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content:
-                                  Text('Copied: ${p.transactionNumber}'),
+                              content: Text('Copied: ${p.transactionNumber}'),
                               backgroundColor: const Color(0xFF16A34A),
                               behavior: SnackBarBehavior.floating,
                               shape: RoundedRectangleBorder(
@@ -601,7 +605,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Index badge
+                        // ── Index badge ──────────────────────────────────
                         Container(
                           width: 34,
                           height: 34,
@@ -618,6 +622,8 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
                           ),
                         ),
                         const SizedBox(width: 12),
+
+                        // ── Details ──────────────────────────────────────
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -659,8 +665,21 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
                               ],
                               Text(_formatDate(p.createdAt),
                                   style: const TextStyle(
-                                      color: Color(0xFF64748B),
-                                      fontSize: 11)),
+                                      color: Color(0xFF64748B), fontSize: 11)),
+                              if (p.processedByName.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    Icon(Icons.person_rounded,
+                                        size: 10, color: Colors.grey[400]),
+                                    const SizedBox(width: 3),
+                                    Text(p.processedByName,
+                                        style: TextStyle(
+                                            color: Colors.grey[400],
+                                            fontSize: 10)),
+                                  ],
+                                ),
+                              ],
                               if (p.note.isNotEmpty) ...[
                                 const SizedBox(height: 2),
                                 Row(
@@ -675,10 +694,35 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
                                   ],
                                 ),
                               ],
+                              // ── Sync indicator ───────────────────────────
+                              const SizedBox(height: 3),
+                              Row(
+                                children: [
+                                  Icon(
+                                    p.synced
+                                        ? Icons.cloud_done_rounded
+                                        : Icons.cloud_off_rounded,
+                                    size: 11,
+                                    color: p.synced
+                                        ? const Color(0xFF16A34A)
+                                        : Colors.grey[400],
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    p.synced ? 'Synced' : 'Pending sync',
+                                    style: TextStyle(
+                                        fontSize: 9,
+                                        color: p.synced
+                                            ? const Color(0xFF16A34A)
+                                            : Colors.grey[400]),
+                                  ),
+                                ],
+                              ),
                             ],
                           ),
                         ),
-                        // Amount
+
+                        // ── Amount + edit button ─────────────────────────
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
@@ -693,6 +737,37 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
                             Text('payment',
                                 style: TextStyle(
                                     color: Colors.grey[400], fontSize: 9)),
+                            if (canEdit) ...[
+                              const SizedBox(height: 8),
+                              GestureDetector(
+                                onTap: () async {
+                                  final edited =
+                                      await EditPaymentSheet.show(
+                                    context,
+                                    payment: p,
+                                    student: _info.student,
+                                    totalFee: _info.totalFee,
+                                  );
+                                  if (edited == true) await _refresh();
+                                },
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(9),
+                                    border: Border.all(
+                                        color: const Color(0xFFF59E0B)
+                                            .withOpacity(0.35)),
+                                  ),
+                                  child: const Icon(
+                                    Icons.edit_rounded,
+                                    size: 15,
+                                    color: Color(0xFFD97706),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ],
@@ -700,8 +775,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
                   ),
                 ),
                 if (!isLast)
-                  Divider(
-                      color: Colors.grey[100], height: 1, indent: 16),
+                  Divider(color: Colors.grey[100], height: 1, indent: 16),
               ],
             );
           })),

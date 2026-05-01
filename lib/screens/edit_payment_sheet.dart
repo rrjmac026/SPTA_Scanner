@@ -151,7 +151,7 @@ class _EditPaymentSheetState extends State<EditPaymentSheet>
         newAmount: _newAmount,
         reason: _reasonCtrl.text.trim(),
         processedByUid: user?.uid ?? '',
-        processedByName: user?.displayName ?? '',
+        processedByName: user?.name ?? '',
         now: now,
       );
 
@@ -814,7 +814,7 @@ class _EditPaymentSheetState extends State<EditPaymentSheet>
                     text: 'Recorded as: ',
                   ),
                   TextSpan(
-                    text: user?.displayName ?? user?.email ?? 'Unknown',
+                    text: user?.name ?? user?.email ?? 'Unknown',
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       color: _navy,

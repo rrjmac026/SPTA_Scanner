@@ -106,8 +106,6 @@ class _ResultScreenState extends State<ResultScreen>
   }
 
   Future<void> _linkTempRecord(StudentPaymentInfo chosen) async {
-    // Keep _isLinking = true for the entire operation so the UI
-    // never renders _buildPaymentView while _info is still null.
     if (mounted) setState(() => _isLinking = true);
 
     await _db.linkTempToLrn(
@@ -117,7 +115,6 @@ class _ResultScreenState extends State<ResultScreen>
       grade: chosen.student.grade,
     );
 
-    // Reload — this will populate _info before we clear _isLinking.
     final info = await _db.getStudentPaymentInfo(widget.lrn);
     if (mounted) {
       setState(() {
@@ -391,9 +388,6 @@ class _ResultScreenState extends State<ResultScreen>
   // ─── Payment view (existing student) ──────────────────────────────────────
 
   Widget _buildPaymentView() {
-    // ── NULL GUARD: _info can be null for a brief frame during async
-    //    reload (e.g. right after temp-linking). Show a spinner instead
-    //    of crashing on the null-check operator.
     if (_info == null) {
       return const Center(
         child: CircularProgressIndicator(color: Color(0xFF16A34A)),
@@ -407,7 +401,7 @@ class _ResultScreenState extends State<ResultScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Temp-linked banner ──────────────────────────────────────────
+          // ── Temp-linked banner ────────────────────────────────────────
           if (info.student.isTempRecord) ...[
             Container(
               padding: const EdgeInsets.all(14),
@@ -444,10 +438,18 @@ class _ResultScreenState extends State<ResultScreen>
           const SizedBox(height: 14),
           PaymentSummaryCard(info: info),
           const SizedBox(height: 14),
+
+          // ── Payment history with edit support ─────────────────────────
           if (info.payments.isNotEmpty) ...[
-            PaymentHistoryCard(payments: info.payments),
+            PaymentHistoryCard(
+              payments: info.payments,
+              student: info.student,
+              totalFee: info.totalFee,
+              onEdited: _loadOrCreateStudent, // refresh everything on edit
+            ),
             const SizedBox(height: 14),
           ],
+
           if (!info.isFullyPaid) ...[
             SizedBox(
               height: 56,
