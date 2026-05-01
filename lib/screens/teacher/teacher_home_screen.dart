@@ -6,6 +6,7 @@ import '../add_transaction_screen.dart';
 import '../login_screen.dart';
 import 'teacher_records_screen.dart';
 import '../../widgets/app_logo.dart';
+import '../../widgets/sync_status_badge.dart'; // ← ADD THIS IMPORT
 
 class TeacherHomeScreen extends StatefulWidget {
   const TeacherHomeScreen({super.key});
@@ -123,6 +124,15 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
                           ],
                         ),
                       ),
+
+                      // ── Sync badge ────────────────────────────────────────
+                      // Shows cloud_done (green) when everything is uploaded,
+                      // or an orange cloud with a red count badge when payments
+                      // are queued offline. Tap it to force-upload immediately.
+                      const SyncStatusBadge(),
+                      const SizedBox(width: 4),
+
+                      // ── Sign-out button ───────────────────────────────────
                       GestureDetector(
                         onTap: _signOut,
                         child: Container(

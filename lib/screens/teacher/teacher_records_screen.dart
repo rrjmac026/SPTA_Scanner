@@ -8,6 +8,7 @@ import '../../models/models.dart';
 import '../../services/auth_service.dart';
 import '../widgets/student_card.dart';
 import '../widgets/export_bottom_sheet.dart';
+import '../../widgets/sync_status_badge.dart'; // ← ADD THIS IMPORT
 
 /// Records screen for teachers — only shows students they personally processed.
 class TeacherRecordsScreen extends StatefulWidget {
@@ -228,6 +229,10 @@ class _TeacherRecordsScreenState extends State<TeacherRecordsScreen> {
           ],
         ),
         actions: [
+          // ── Sync status badge ──────────────────────────────────────────
+          // Shows live upload status; orange + count = pending, green = all synced
+          const SyncStatusBadge(),
+
           if (_isExporting)
             const Padding(
               padding: EdgeInsets.all(16),
