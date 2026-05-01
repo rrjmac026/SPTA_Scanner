@@ -10,6 +10,7 @@ import '../login_screen.dart';
 import 'manage_users_screen.dart';
 import '../../widgets/app_logo.dart';
 import '../audit_log_screens.dart'; // <-- add this import
+import '../../widgets/sync_status_badge.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -116,32 +117,31 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                                     letterSpacing: -0.5)),
                             const SizedBox(height: 2),
                             Text(
-                              user?.name ?? 'Admin',
+                              user?.name ?? 'Teacher',
                               style: const TextStyle(
                                   color: Colors.white70,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
                       ),
-                      _headerBtn(Icons.people_rounded, () async {
-                        await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const ManageUsersScreen()));
-                        _loadStats();
-                      }),
+                      const SyncStatusBadge(),
                       const SizedBox(width: 8),
-                      _headerBtn(Icons.settings_rounded, () async {
-                        await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const SettingsScreen()));
-                        _loadStats();
-                      }),
-                      const SizedBox(width: 8),
-                      _headerBtn(Icons.logout_rounded, _signOut),
+                      GestureDetector(
+                        onTap: _signOut,
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.logout_rounded,
+                              color: Colors.white, size: 20),
+                        ),
+                      ),
                     ],
                   ),
 

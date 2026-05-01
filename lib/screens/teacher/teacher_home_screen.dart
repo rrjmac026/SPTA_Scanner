@@ -6,7 +6,8 @@ import '../add_transaction_screen.dart';
 import '../login_screen.dart';
 import 'teacher_records_screen.dart';
 import '../../widgets/app_logo.dart';
-import '../audit_log_screens.dart'; // <-- add this import
+import '../audit_log_screens.dart';
+import '../../widgets/sync_status_badge.dart';
 
 class TeacherHomeScreen extends StatefulWidget {
   const TeacherHomeScreen({super.key});
@@ -124,6 +125,8 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
                           ],
                         ),
                       ),
+                      const SyncStatusBadge(),
+                      const SizedBox(width: 8),
                       GestureDetector(
                         onTap: _signOut,
                         child: Container(

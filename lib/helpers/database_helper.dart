@@ -3,7 +3,8 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/models.dart';
 import '../services/firestore_sync_service.dart';
-import '../models/audit_log.dart';
+import '../models/audit_log.dart'
+;
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -504,6 +505,7 @@ class DatabaseHelper {
     FirestoreSyncService().upsertPayment(saved, onSynced: () async {
       await markPaymentSynced(id);
     });
+    FirestoreSyncService().syncPendingAuditLogs();
 
     return saved;
   }
@@ -818,4 +820,6 @@ class DatabaseHelper {
       return logId;
     });
   }
+
+  
 }
