@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
@@ -5,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import '../helpers/database_helper.dart';
 import '../helpers/export_helper.dart';
 import '../models/models.dart';
+import '../services/firestore_sync_service.dart';
 import 'widgets/student_card.dart';
 import 'widgets/export_bottom_sheet.dart';
 
@@ -17,12 +19,24 @@ class RecordsScreen extends StatefulWidget {
 
 class _RecordsScreenState extends State<RecordsScreen> {
   final DatabaseHelper _db = DatabaseHelper();
+  final FirestoreSyncService _sync = FirestoreSyncService();
+
+  // Raw data from Firestore streams
+  List<Student> _allStudents = [];
+  List<Payment> _allPayments = [];
+  double _totalFee = 750;
+
+  // Computed infos built from streams
   List<StudentPaymentInfo> _infos = [];
+
   bool _isLoading = true;
   bool _isExporting = false;
   String _searchQuery = '';
   String _selectedGradeFilter = 'All';
   String _selectedStatusFilter = 'All';
+
+  StreamSubscription<List<Student>>? _studentsSub;
+  StreamSubscription<List<Payment>>? _paymentsSub;
 
   final List<String> _gradeFilters = [
     'All', 'Grade 7', 'Grade 8', 'Grade 9',
@@ -35,13 +49,90 @@ class _RecordsScreenState extends State<RecordsScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadTotalFee();
+    _subscribeToStreams();
   }
 
-  Future<void> _load() async {
-    setState(() => _isLoading = true);
+  @override
+  void dispose() {
+    _studentsSub?.cancel();
+    _paymentsSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadTotalFee() async {
+    final fee = await _db.getTotalFee();
+    if (mounted) {
+      setState(() => _totalFee = fee);
+      _rebuildInfos();
+    }
+  }
+
+  void _subscribeToStreams() {
+    // Listen to students stream
+    _studentsSub = _sync.studentsStream().listen(
+      (students) {
+        if (!mounted) return;
+        _allStudents = students;
+        _rebuildInfos();
+      },
+      onError: (_) => _fallbackToLocal(),
+    );
+
+    // Listen to all payments stream
+    _paymentsSub = _sync.paymentsStream().listen(
+      (payments) {
+        if (!mounted) return;
+        _allPayments = payments;
+        _rebuildInfos();
+      },
+      onError: (_) => _fallbackToLocal(),
+    );
+  }
+
+  /// Build StudentPaymentInfo list by joining students + payments in memory.
+  void _rebuildInfos() {
+    if (!mounted) return;
+
+    // Group payments by studentId
+    final Map<int, List<Payment>> paymentsByStudent = {};
+    for (final p in _allPayments) {
+      if (p.studentId != null) {
+        paymentsByStudent.putIfAbsent(p.studentId, () => []).add(p);
+      }
+    }
+
+    final infos = _allStudents.map((student) {
+      final payments = paymentsByStudent[student.id] ?? [];
+      // Sort payments by date
+      payments.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      final amountPaid = payments.fold<double>(0, (s, p) => s + p.amount);
+      return StudentPaymentInfo(
+        student: student,
+        totalFee: _totalFee,
+        amountPaid: amountPaid,
+        payments: payments,
+      );
+    }).toList();
+
+    // Sort by registration date descending
+    infos.sort((a, b) => b.student.createdAt.compareTo(a.student.createdAt));
+
+    setState(() {
+      _infos = infos;
+      _isLoading = false;
+    });
+  }
+
+  /// Fallback: load from local SQLite if Firestore is unavailable.
+  Future<void> _fallbackToLocal() async {
     final infos = await _db.getAllStudentPaymentInfos();
-    if (mounted) setState(() { _infos = infos; _isLoading = false; });
+    if (mounted) {
+      setState(() {
+        _infos = infos;
+        _isLoading = false;
+      });
+    }
   }
 
   List<StudentPaymentInfo> get _filtered {
@@ -58,7 +149,6 @@ class _RecordsScreenState extends State<RecordsScreen> {
     }).toList();
   }
 
-  // Count of walk-in / unlinked temp records
   int get _tempCount => _infos.where((i) => i.student.isTempRecord).length;
 
   Future<void> _exportExcel() async {
@@ -199,8 +289,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          color:
-              isSelected ? Colors.white : Colors.white.withOpacity(0.15),
+          color: isSelected ? Colors.white : Colors.white.withOpacity(0.15),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
               color: isSelected
@@ -259,11 +348,25 @@ class _RecordsScreenState extends State<RecordsScreen> {
           children: [
             const Text('Payment Records',
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-            Text('${_infos.length} students registered',
+            Text('${_infos.length} students · live',
                 style: const TextStyle(fontSize: 11, color: Colors.white60)),
           ],
         ),
         actions: [
+          // Live indicator dot
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Center(
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF4ADE80),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ),
           if (_isExporting)
             const Padding(
               padding: EdgeInsets.all(16),
@@ -278,10 +381,6 @@ class _RecordsScreenState extends State<RecordsScreen> {
               icon: const Icon(Icons.download_rounded),
               onPressed: _infos.isEmpty ? null : _showExportOptions,
             ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _load,
-          ),
         ],
       ),
       body: Column(
@@ -364,7 +463,6 @@ class _RecordsScreenState extends State<RecordsScreen> {
                       'Collected',
                       Icons.payments_rounded,
                       const Color(0xFF0D9488)),
-                  // Walk-in badge
                   if (_tempCount > 0) ...[
                     const SizedBox(width: 8),
                     Container(width: 1, height: 28, color: Colors.grey[200]),
@@ -403,8 +501,17 @@ class _RecordsScreenState extends State<RecordsScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                        color: Color(0xFF16A34A)))
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(color: Color(0xFF16A34A)),
+                        SizedBox(height: 12),
+                        Text('Connecting to live feed…',
+                            style: TextStyle(
+                                color: Color(0xFF6B7280), fontSize: 13)),
+                      ],
+                    ),
+                  )
                 : filtered.isEmpty
                     ? Center(
                         child: Column(
@@ -440,7 +547,11 @@ class _RecordsScreenState extends State<RecordsScreen> {
                         itemBuilder: (_, i) => StudentCard(
                           info: filtered[i],
                           index: i,
-                          onRecordChanged: _load, // refresh after LRN assigned
+                          onRecordChanged: () {
+                            // No manual reload needed — streams auto-update.
+                            // But we still honour the callback in case
+                            // StudentCard needs it for local UI resets.
+                          },
                         ),
                       ),
           ),
