@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../helpers/database_helper.dart';
+import '../../models/models.dart';
 import '../../services/auth_service.dart';
+import '../../services/firestore_sync_service.dart';
 import '../scanner_screen.dart';
 import '../add_transaction_screen.dart';
 import '../login_screen.dart';
@@ -16,17 +19,24 @@ class TeacherHomeScreen extends StatefulWidget {
   State<TeacherHomeScreen> createState() => _TeacherHomeScreenState();
 }
 
-// ── FIX: add WidgetsBindingObserver so stats refresh when the app resumes ──
 class _TeacherHomeScreenState extends State<TeacherHomeScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-// ───────────────────────────────────────────────────────────────────────────
   final DatabaseHelper _db = DatabaseHelper();
   final AuthService _auth = AuthService();
+  final FirestoreSyncService _sync = FirestoreSyncService();
 
+  // ── In-memory caches from Firestore streams ──────────────────────────────
+  List<Payment> _allPayments = [];
+  List<Student> _allStudents = [];
+  double _totalFee = 750;
+
+  // ── Computed stats ───────────────────────────────────────────────────────
   int _myStudentCount = 0;
   double _myCollected = 0;
   int _myFullyPaid = 0;
-  double _totalFee = 750;
+
+  StreamSubscription<List<Payment>>? _paymentsSub;
+  StreamSubscription<List<Student>>? _studentsSub;
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -34,8 +44,10 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this); // ← FIX: register observer
-    _loadStats();
+    WidgetsBinding.instance.addObserver(this);
+    _loadFee();
+    _subscribeToStreams();
+
     _pulseController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
@@ -47,19 +59,123 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this); // ← FIX: unregister
+    WidgetsBinding.instance.removeObserver(this);
+    _paymentsSub?.cancel();
+    _studentsSub?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
 
-  // ── FIX: reload stats every time the app comes back to the foreground ────
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _loadStats();
+    if (state == AppLifecycleState.resumed) _loadFee();
   }
-  // ─────────────────────────────────────────────────────────────────────────
 
-  Future<void> _loadStats() async {
+  Future<void> _loadFee() async {
+    final fee = await _db.getTotalFee();
+    if (mounted) {
+      setState(() => _totalFee = fee);
+      _recomputeStats();
+    }
+  }
+
+  void _subscribeToStreams() {
+    _paymentsSub = _sync.paymentsStream().listen(
+      (payments) async {
+        if (!mounted) return;
+        _allPayments = payments;
+
+        // Keep SQLite fresh for exports / offline use
+        for (final p in payments) {
+          if (p.transactionNumber.isNotEmpty) {
+            await _db.upsertTransactionFromFirestore({
+              'transactionNumber': p.transactionNumber,
+              'studentId': p.studentId,
+              'amount': p.amount,
+              'note': p.note,
+              'createdAt': p.createdAt,
+              'processedByUid': p.processedByUid,
+              'processedByName': p.processedByName,
+            });
+          }
+        }
+
+        _recomputeStats();
+      },
+      onError: (_) => _fallbackToLocal(),
+    );
+
+    _studentsSub = _sync.studentsStream().listen(
+      (students) async {
+        if (!mounted) return;
+        _allStudents = students;
+
+        for (final s in students) {
+          await _db.upsertStudentFromFirestore({
+            'lrn': s.lrn,
+            'name': s.name,
+            'grade': s.grade,
+            'createdAt': s.createdAt,
+            'isTemp': s.isTemp,
+          });
+        }
+
+        _recomputeStats();
+      },
+      onError: (_) => _fallbackToLocal(),
+    );
+  }
+
+  /// Recompute stats from in-memory lists — same pattern as AdminHomeScreen,
+  /// but filtered to only this teacher's payments.
+  void _recomputeStats() {
+    if (!mounted) return;
+
+    final uid = _auth.currentUser?.uid ?? '';
+
+    // Find student IDs where at least one payment was made by this teacher.
+    final myStudentIds = _allPayments
+        .where((p) => p.processedByUid == uid)
+        .map((p) => p.studentId)
+        .toSet();
+
+    if (myStudentIds.isEmpty) {
+      setState(() {
+        _myStudentCount = 0;
+        _myCollected = 0;
+        _myFullyPaid = 0;
+      });
+      return;
+    }
+
+    // Group ALL payments by studentId so balances are correct even when
+    // multiple teachers collected from the same student.
+    final Map<int, double> paidByStudent = {};
+    for (final p in _allPayments) {
+      paidByStudent[p.studentId] =
+          (paidByStudent[p.studentId] ?? 0) + p.amount;
+    }
+
+    // Total collected = sum of only THIS teacher's payments.
+    final myCollected = _allPayments
+        .where((p) => p.processedByUid == uid)
+        .fold<double>(0, (sum, p) => sum + p.amount);
+
+    // Fully paid = students this teacher touched whose total balance is cleared.
+    final myFullyPaid = myStudentIds
+        .where((sid) => (paidByStudent[sid] ?? 0) >= _totalFee)
+        .length;
+
+    setState(() {
+      _myStudentCount = myStudentIds.length;
+      _myCollected = myCollected;
+      _myFullyPaid = myFullyPaid;
+    });
+  }
+
+  /// Fallback: read from SQLite when Firestore streams fail (offline).
+  Future<void> _fallbackToLocal() async {
+    if (!mounted) return;
     final uid = _auth.currentUser?.uid ?? '';
     final fee = await _db.getTotalFee();
     final infos = await _db.getStudentPaymentInfosByProcessor(uid);
@@ -275,7 +391,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
                                 context,
                                 MaterialPageRoute(
                                     builder: (_) => const ScannerScreen()));
-                            _loadStats();
+                            // No manual reload — streams update stats automatically.
                           },
                           borderRadius: BorderRadius.circular(20),
                           child: Padding(
@@ -353,7 +469,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
                                   MaterialPageRoute(
                                       builder: (_) =>
                                           const TeacherRecordsScreen()));
-                              _loadStats();
+                              // Streams handle stats automatically.
                             },
                           ),
                         ),
@@ -369,7 +485,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
                                   MaterialPageRoute(
                                       builder: (_) =>
                                           const AddTransactionScreen()));
-                              _loadStats();
+                              // Streams handle stats automatically.
                             },
                           ),
                         ),
@@ -490,7 +606,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
     required VoidCallback onTap,
     bool fullWidth = false,
   }) {
-    final content = Container(
+    return Container(
       width: fullWidth ? double.infinity : null,
       decoration: BoxDecoration(
         color: Colors.white,
@@ -567,7 +683,5 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
         ),
       ),
     );
-
-    return content;
   }
 }
