@@ -23,10 +23,12 @@ class StudentRepository {
     if (existing.isNotEmpty) return null;
 
     late final int id;
+    late final AuditLog auditLog;
+
     await db.transaction((txn) async {
       id = await txn.insert('students', student.toMap());
 
-      await txn.insert('audit_logs', AuditLog(
+      auditLog = AuditLog(
         action: AuditAction.studentRegistered,
         targetType: 'student',
         targetId: id,
@@ -35,7 +37,8 @@ class StudentRepository {
         processedByName: processedByName,
         createdAt: student.createdAt,
         synced: false,
-      ).toMap());
+      );
+      await txn.insert('audit_logs', auditLog.toMap());
     });
 
     final inserted = Student(
@@ -46,7 +49,20 @@ class StudentRepository {
       createdAt: student.createdAt,
       isTemp: student.isTemp,
     );
-    FirestoreSyncService().upsertStudent(inserted);
+
+    final syncService = FirestoreSyncService();
+    syncService.upsertStudent(inserted);
+    syncService.upsertAuditLog(AuditLog(
+      id: id,
+      action: auditLog.action,
+      targetType: auditLog.targetType,
+      targetId: auditLog.targetId,
+      newValue: auditLog.newValue,
+      processedByUid: auditLog.processedByUid,
+      processedByName: auditLog.processedByName,
+      createdAt: auditLog.createdAt,
+      synced: false,
+    ));
 
     return id;
   }
@@ -117,6 +133,8 @@ class StudentRepository {
     required String realLrn,
     required String realName,
     required String grade,
+    String processedByUid = '',
+    String processedByName = '',
   }) async {
     final db = await _database;
     final existing =
@@ -142,14 +160,32 @@ class StudentRepository {
       where: 'student_id = ?',
       whereArgs: [tempStudentId],
     );
-    await db.delete('students',
-        where: 'id = ?', whereArgs: [tempStudentId]);
+    await db.delete('students', where: 'id = ?', whereArgs: [tempStudentId]);
+
+    // Log the LRN link action
+    final now = DateTime.now().toIso8601String();
+    final auditLog = AuditLog(
+      action: AuditAction.lrnLinked,
+      targetType: 'student',
+      targetId: realStudentId,
+      oldValue: 'TEMP-$tempStudentId',
+      newValue: realLrn,
+      processedByUid: processedByUid,
+      processedByName: processedByName,
+      createdAt: now,
+      synced: false,
+    );
+    await db.insert('audit_logs', auditLog.toMap());
+    FirestoreSyncService().upsertAuditLog(auditLog);
+
     return true;
   }
 
   Future<bool> assignLrnToTemp({
     required int tempStudentId,
     required String realLrn,
+    String processedByUid = '',
+    String processedByName = '',
   }) async {
     final db = await _database;
     final conflict =
@@ -161,6 +197,22 @@ class StudentRepository {
       where: 'id = ?',
       whereArgs: [tempStudentId],
     );
+
+    // Log the LRN assign action
+    final now = DateTime.now().toIso8601String();
+    final auditLog = AuditLog(
+      action: AuditAction.lrnAssigned,
+      targetType: 'student',
+      targetId: tempStudentId,
+      newValue: realLrn,
+      processedByUid: processedByUid,
+      processedByName: processedByName,
+      createdAt: now,
+      synced: false,
+    );
+    await db.insert('audit_logs', auditLog.toMap());
+    FirestoreSyncService().upsertAuditLog(auditLog);
+
     return true;
   }
 

@@ -32,9 +32,9 @@ class PaymentRepository {
     map['synced'] = 0;
 
     late final int id;
-    late final Payment saved;
+    late final AuditLog auditLog;
 
-    // Write payment + audit log atomically
+    // Write payment + audit log atomically to SQLite
     await db.transaction((txnDb) async {
       id = await txnDb.insert('payments', map);
 
@@ -46,7 +46,7 @@ class PaymentRepository {
       );
 
       // ── Audit log entry ──────────────────────────────────────────────────
-      final log = AuditLog(
+      auditLog = AuditLog(
         action: AuditAction.paymentAdded,
         targetType: 'payment',
         targetId: id,
@@ -58,10 +58,10 @@ class PaymentRepository {
         createdAt: withTxn.createdAt,
         synced: false,
       );
-      await txnDb.insert('audit_logs', log.toMap());
+      await txnDb.insert('audit_logs', auditLog.toMap());
     });
 
-    saved = Payment(
+    final saved = Payment(
       id: id,
       studentId: withTxn.studentId,
       amount: withTxn.amount,
@@ -73,11 +73,29 @@ class PaymentRepository {
       synced: false,
     );
 
-    // Attempt immediate Firestore sync
-    FirestoreSyncService().upsertPayment(saved, onSynced: () async {
+    // ── Push to Firestore immediately (payment + audit log) ────────────────
+    final syncService = FirestoreSyncService();
+
+    // Payment
+    syncService.upsertPayment(saved, onSynced: () async {
       await markPaymentSynced(id);
     });
-    FirestoreSyncService().syncPendingAuditLogs();
+
+    // Audit log — push directly with the known id
+    final auditLogWithId = AuditLog(
+      id: id, // reuse payment insert id as a reference; actual DB id may differ
+      action: auditLog.action,
+      targetType: auditLog.targetType,
+      targetId: auditLog.targetId,
+      oldValue: auditLog.oldValue,
+      newValue: auditLog.newValue,
+      reason: auditLog.reason,
+      processedByUid: auditLog.processedByUid,
+      processedByName: auditLog.processedByName,
+      createdAt: auditLog.createdAt,
+      synced: false,
+    );
+    syncService.upsertAuditLog(auditLogWithId);
 
     return saved;
   }
@@ -190,7 +208,10 @@ class PaymentRepository {
     required String now,
   }) async {
     final db = await _database;
-    return await db.transaction((txn) async {
+    late final AuditLog auditLog;
+    late final int? logId;
+
+    logId = await db.transaction((txn) async {
       // 1. Update the payment record
       final updated = await txn.update(
         'payments',
@@ -201,7 +222,7 @@ class PaymentRepository {
       if (updated == 0) return null;
 
       // 2. Write the immutable audit entry
-      final log = AuditLog(
+      auditLog = AuditLog(
         action: AuditAction.paymentEdited,
         targetType: 'payment',
         targetId: paymentId,
@@ -213,8 +234,35 @@ class PaymentRepository {
         createdAt: now,
         synced: false,
       );
-      final logId = await txn.insert('audit_logs', log.toMap());
-      return logId;
+      return await txn.insert('audit_logs', auditLog.toMap());
     });
+
+    // ── Push audit log to Firestore immediately ────────────────────────────
+    if (logId != null) {
+      FirestoreSyncService().upsertAuditLog(AuditLog(
+        id: logId,
+        action: auditLog.action,
+        targetType: auditLog.targetType,
+        targetId: auditLog.targetId,
+        oldValue: auditLog.oldValue,
+        newValue: auditLog.newValue,
+        reason: auditLog.reason,
+        processedByUid: auditLog.processedByUid,
+        processedByName: auditLog.processedByName,
+        createdAt: auditLog.createdAt,
+        synced: false,
+      ));
+
+      // Also re-sync the edited payment amount to Firestore
+      final db2 = await _database;
+      final rows = await db2.query('payments',
+          where: 'id = ?', whereArgs: [paymentId]);
+      if (rows.isNotEmpty) {
+        final updatedPayment = Payment.fromMap(rows.first);
+        FirestoreSyncService().upsertPayment(updatedPayment);
+      }
+    }
+
+    return logId;
   }
 }

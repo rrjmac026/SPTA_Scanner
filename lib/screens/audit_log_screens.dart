@@ -1,10 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../helpers/database_helper.dart';
 import '../models/audit_log.dart';
+import '../services/firestore_sync_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Teacher screen
+// Teacher screen — sees only their own logs, live from Firestore
 // ─────────────────────────────────────────────────────────────────────────────
 
 class TeacherAuditLogScreen extends StatefulWidget {
@@ -15,13 +16,14 @@ class TeacherAuditLogScreen extends StatefulWidget {
 }
 
 class _TeacherAuditLogScreenState extends State<TeacherAuditLogScreen> {
-  final DatabaseHelper _db = DatabaseHelper();
   final _user = FirebaseAuth.instance.currentUser;
+  final _sync = FirestoreSyncService();
 
   List<AuditLog> _logs = [];
   List<AuditLog> _filtered = [];
   bool _loading = true;
   String _filterAction = 'all';
+  StreamSubscription<List<AuditLog>>? _sub;
 
   static const _actionFilters = <String, String>{
     'all': 'All',
@@ -35,27 +37,36 @@ class _TeacherAuditLogScreenState extends State<TeacherAuditLogScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _subscribeToLogs();
   }
 
-  Future<void> _load() async {
-    if (!mounted) return;
-    setState(() => _loading = true);
-    try {
-      final uid = _user?.uid;
-      final logs = uid != null
-          ? await _db.getAuditLogsByUser(uid)
-          : <AuditLog>[];
-      if (mounted) {
-        setState(() {
-          _logs = logs;
-          _loading = false;
-          _applyFilter();
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _loading = false);
+  void _subscribeToLogs() {
+    final uid = _user?.uid;
+    if (uid == null) {
+      setState(() => _loading = false);
+      return;
     }
+
+    _sub = _sync.auditLogsStreamForUser(uid).listen(
+      (logs) {
+        if (mounted) {
+          setState(() {
+            _logs = logs;
+            _loading = false;
+            _applyFilter();
+          });
+        }
+      },
+      onError: (_) {
+        if (mounted) setState(() => _loading = false);
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
   }
 
   void _applyFilter() {
@@ -72,13 +83,29 @@ class _TeacherAuditLogScreenState extends State<TeacherAuditLogScreen> {
         backgroundColor: const Color(0xFF14532D),
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text('My Activity Log',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('My Activity Log',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            Text('Live · updates automatically',
+                style: TextStyle(fontSize: 10, color: Colors.white60)),
+          ],
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _load,
-            tooltip: 'Refresh',
+          // Live indicator dot
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF4ADE80),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -108,15 +135,12 @@ class _TeacherAuditLogScreenState extends State<TeacherAuditLogScreen> {
                             ? 'No activity recorded yet.'
                             : 'No records for this filter.',
                       )
-                    : RefreshIndicator(
-                        color: const Color(0xFF16A34A),
-                        onRefresh: _load,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                          itemCount: _filtered.length,
-                          itemBuilder: (_, i) =>
-                              _AuditLogCard(log: _filtered[i]),
-                        ),
+                    : ListView.builder(
+                        padding:
+                            const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                        itemCount: _filtered.length,
+                        itemBuilder: (_, i) =>
+                            _AuditLogCard(log: _filtered[i]),
                       ),
           ),
         ],
@@ -126,7 +150,7 @@ class _TeacherAuditLogScreenState extends State<TeacherAuditLogScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Admin screen
+// Admin screen — sees ALL logs from ALL devices, live from Firestore
 // ─────────────────────────────────────────────────────────────────────────────
 
 class AdminAuditLogScreen extends StatefulWidget {
@@ -137,7 +161,7 @@ class AdminAuditLogScreen extends StatefulWidget {
 }
 
 class _AdminAuditLogScreenState extends State<AdminAuditLogScreen> {
-  final DatabaseHelper _db = DatabaseHelper();
+  final _sync = FirestoreSyncService();
 
   List<AuditLog> _logs = [];
   List<AuditLog> _filtered = [];
@@ -146,6 +170,7 @@ class _AdminAuditLogScreenState extends State<AdminAuditLogScreen> {
   String _filterAction = 'all';
   String? _filterUid;
   final Map<String, String> _knownUsers = {};
+  StreamSubscription<List<AuditLog>>? _sub;
 
   static const _actionFilters = <String, String>{
     'all': 'All',
@@ -159,39 +184,48 @@ class _AdminAuditLogScreenState extends State<AdminAuditLogScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _subscribeToLogs();
   }
 
-  Future<void> _load() async {
-    if (!mounted) return;
-    setState(() => _loading = true);
-    try {
-      final logs = await _db.getAllAuditLogs();
-      final Map<String, String> users = {};
-      for (final l in logs) {
-        if (l.processedByUid.isNotEmpty) {
-          users[l.processedByUid] = l.processedByName.isNotEmpty
-              ? l.processedByName
-              : l.processedByUid;
+  void _subscribeToLogs() {
+    _sub = _sync.auditLogsStream().listen(
+      (logs) {
+        if (!mounted) return;
+        final Map<String, String> users = {};
+        for (final l in logs) {
+          if (l.processedByUid.isNotEmpty) {
+            users[l.processedByUid] = l.processedByName.isNotEmpty
+                ? l.processedByName
+                : l.processedByUid;
+          }
         }
-      }
-      if (mounted) {
         setState(() {
           _logs = logs;
-          _knownUsers..clear()..addAll(users);
+          _knownUsers
+            ..clear()
+            ..addAll(users);
           _loading = false;
           _applyFilter();
         });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _loading = false);
-    }
+      },
+      onError: (_) {
+        if (mounted) setState(() => _loading = false);
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
   }
 
   void _applyFilter() {
     _filtered = _logs.where((l) {
-      final actionOk = _filterAction == 'all' || l.action == _filterAction;
-      final userOk = _filterUid == null || l.processedByUid == _filterUid;
+      final actionOk =
+          _filterAction == 'all' || l.action == _filterAction;
+      final userOk =
+          _filterUid == null || l.processedByUid == _filterUid;
       return actionOk && userOk;
     }).toList();
   }
@@ -201,21 +235,24 @@ class _AdminAuditLogScreenState extends State<AdminAuditLogScreen> {
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const SizedBox(height: 8),
             Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
                   color: Colors.grey[300],
                   borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(height: 12),
             const Text('Filter by Teacher',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                style:
+                    TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
             ListTile(
               leading: const Icon(Icons.people_alt_rounded,
@@ -224,29 +261,39 @@ class _AdminAuditLogScreenState extends State<AdminAuditLogScreen> {
               selected: _filterUid == null,
               selectedColor: const Color(0xFF16A34A),
               onTap: () {
-                setState(() { _filterUid = null; _applyFilter(); });
+                setState(() {
+                  _filterUid = null;
+                  _applyFilter();
+                });
                 Navigator.pop(context);
               },
             ),
             ..._knownUsers.entries.map((e) => ListTile(
-              leading: CircleAvatar(
-                backgroundColor: const Color(0xFFDCFCE7),
-                radius: 18,
-                child: Text(
-                  e.value.isNotEmpty ? e.value[0].toUpperCase() : '?',
-                  style: const TextStyle(
-                      color: Color(0xFF16A34A), fontWeight: FontWeight.w700),
-                ),
-              ),
-              title: Text(e.value),
-              subtitle: Text(e.key, style: const TextStyle(fontSize: 11)),
-              selected: _filterUid == e.key,
-              selectedColor: const Color(0xFF16A34A),
-              onTap: () {
-                setState(() { _filterUid = e.key; _applyFilter(); });
-                Navigator.pop(context);
-              },
-            )),
+                  leading: CircleAvatar(
+                    backgroundColor: const Color(0xFFDCFCE7),
+                    radius: 18,
+                    child: Text(
+                      e.value.isNotEmpty
+                          ? e.value[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                          color: Color(0xFF16A34A),
+                          fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  title: Text(e.value),
+                  subtitle: Text(e.key,
+                      style: const TextStyle(fontSize: 11)),
+                  selected: _filterUid == e.key,
+                  selectedColor: const Color(0xFF16A34A),
+                  onTap: () {
+                    setState(() {
+                      _filterUid = e.key;
+                      _applyFilter();
+                    });
+                    Navigator.pop(context);
+                  },
+                )),
             const SizedBox(height: 8),
           ],
         ),
@@ -262,9 +309,31 @@ class _AdminAuditLogScreenState extends State<AdminAuditLogScreen> {
         backgroundColor: const Color(0xFF14532D),
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text('Audit Log',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Audit Log',
+                style:
+                    TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            Text('Live · all devices',
+                style: TextStyle(fontSize: 10, color: Colors.white60)),
+          ],
+        ),
         actions: [
+          // Live indicator dot
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Center(
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF4ADE80),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ),
           IconButton(
             icon: Stack(
               clipBehavior: Clip.none,
@@ -272,21 +341,20 @@ class _AdminAuditLogScreenState extends State<AdminAuditLogScreen> {
                 const Icon(Icons.person_search_rounded),
                 if (_filterUid != null)
                   Positioned(
-                    right: -2, top: -2,
+                    right: -2,
+                    top: -2,
                     child: Container(
-                      width: 8, height: 8,
+                      width: 8,
+                      height: 8,
                       decoration: const BoxDecoration(
-                          color: Color(0xFFFBBF24), shape: BoxShape.circle),
+                          color: Color(0xFFFBBF24),
+                          shape: BoxShape.circle),
                     ),
                   ),
               ],
             ),
             onPressed: _showUserPicker,
             tooltip: 'Filter by teacher',
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _load,
           ),
         ],
       ),
@@ -305,7 +373,8 @@ class _AdminAuditLogScreenState extends State<AdminAuditLogScreen> {
           if (_filterUid != null)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 8),
               color: const Color(0xFFFEF9C3),
               child: Row(
                 children: [
@@ -322,8 +391,10 @@ class _AdminAuditLogScreenState extends State<AdminAuditLogScreen> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: () =>
-                        setState(() { _filterUid = null; _applyFilter(); }),
+                    onTap: () => setState(() {
+                      _filterUid = null;
+                      _applyFilter();
+                    }),
                     child: const Icon(Icons.close_rounded,
                         color: Color(0xFF92400E), size: 16),
                   ),
@@ -343,17 +414,15 @@ class _AdminAuditLogScreenState extends State<AdminAuditLogScreen> {
             child: _loading
                 ? const _LoadingView()
                 : _filtered.isEmpty
-                    ? const _EmptyState(message: 'No records match this filter.')
-                    : RefreshIndicator(
-                        color: const Color(0xFF16A34A),
-                        onRefresh: _load,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                          itemCount: _filtered.length,
-                          itemBuilder: (_, i) => _AuditLogCard(
-                            log: _filtered[i],
-                            showUser: true,
-                          ),
+                    ? const _EmptyState(
+                        message: 'No records match this filter.')
+                    : ListView.builder(
+                        padding:
+                            const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                        itemCount: _filtered.length,
+                        itemBuilder: (_, i) => _AuditLogCard(
+                          log: _filtered[i],
+                          showUser: true,
                         ),
                       ),
           ),
@@ -440,7 +509,8 @@ class _CountBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       color: const Color(0xFFDCFCE7),
       child: Row(
         children: [
@@ -470,8 +540,9 @@ class _LoadingView extends StatelessWidget {
           children: [
             CircularProgressIndicator(color: Color(0xFF16A34A)),
             SizedBox(height: 12),
-            Text('Loading records…',
-                style: TextStyle(color: Color(0xFF6B7280), fontSize: 13)),
+            Text('Connecting to live feed…',
+                style:
+                    TextStyle(color: Color(0xFF6B7280), fontSize: 13)),
           ],
         ),
       );
@@ -485,10 +556,12 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.history_rounded, size: 56, color: Colors.grey[300]),
+            Icon(Icons.history_rounded,
+                size: 56, color: Colors.grey[300]),
             const SizedBox(height: 12),
             Text(message,
-                style: TextStyle(color: Colors.grey[500], fontSize: 14)),
+                style:
+                    TextStyle(color: Colors.grey[500], fontSize: 14)),
           ],
         ),
       );
@@ -506,31 +579,44 @@ class _AuditLogCard extends StatelessWidget {
 
   Color get _color {
     switch (log.action) {
-      case AuditAction.paymentAdded:      return const Color(0xFF16A34A);
-      case AuditAction.paymentEdited:     return const Color(0xFFD97706);
+      case AuditAction.paymentAdded:
+        return const Color(0xFF16A34A);
+      case AuditAction.paymentEdited:
+        return const Color(0xFFD97706);
       case AuditAction.lrnLinked:
-      case AuditAction.lrnAssigned:       return const Color(0xFF2563EB);
-      case AuditAction.studentRegistered: return const Color(0xFF7C3AED);
-      default:                            return Colors.grey;
+      case AuditAction.lrnAssigned:
+        return const Color(0xFF2563EB);
+      case AuditAction.studentRegistered:
+        return const Color(0xFF7C3AED);
+      default:
+        return Colors.grey;
     }
   }
 
   IconData get _icon {
     switch (log.action) {
-      case AuditAction.paymentAdded:      return Icons.add_card_rounded;
-      case AuditAction.paymentEdited:     return Icons.edit_rounded;
-      case AuditAction.lrnLinked:         return Icons.link_rounded;
-      case AuditAction.lrnAssigned:       return Icons.assignment_ind_rounded;
-      case AuditAction.studentRegistered: return Icons.person_add_rounded;
-      default:                            return Icons.history_rounded;
+      case AuditAction.paymentAdded:
+        return Icons.add_card_rounded;
+      case AuditAction.paymentEdited:
+        return Icons.edit_rounded;
+      case AuditAction.lrnLinked:
+        return Icons.link_rounded;
+      case AuditAction.lrnAssigned:
+        return Icons.assignment_ind_rounded;
+      case AuditAction.studentRegistered:
+        return Icons.person_add_rounded;
+      default:
+        return Icons.history_rounded;
     }
   }
 
   String _fmt(String iso) {
     try {
       final dt = DateTime.parse(iso);
-      const mo = ['Jan','Feb','Mar','Apr','May','Jun',
-                   'Jul','Aug','Sep','Oct','Nov','Dec'];
+      const mo = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
       final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
       final ampm = dt.hour >= 12 ? 'PM' : 'AM';
       final m = dt.minute.toString().padLeft(2, '0');
@@ -573,7 +659,8 @@ class _AuditLogCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    width: 34, height: 34,
+                    width: 34,
+                    height: 34,
                     decoration: BoxDecoration(
                       color: color.withOpacity(0.15),
                       shape: BoxShape.circle,
@@ -581,14 +668,11 @@ class _AuditLogCard extends StatelessWidget {
                     child: Icon(_icon, color: color, size: 17),
                   ),
                   const SizedBox(height: 6),
-                  Icon(
-                    log.synced
-                        ? Icons.cloud_done_rounded
-                        : Icons.cloud_off_rounded,
+                  // All Firestore-sourced logs are synced
+                  const Icon(
+                    Icons.cloud_done_rounded,
                     size: 13,
-                    color: log.synced
-                        ? const Color(0xFF16A34A)
-                        : Colors.grey[400],
+                    color: Color(0xFF16A34A),
                   ),
                 ],
               ),
@@ -651,24 +735,33 @@ class _AuditLogCard extends StatelessWidget {
                     ],
 
                     // Before → After pills
-                    if (log.oldValue != null || log.newValue != null) ...[
+                    if (log.oldValue != null ||
+                        log.newValue != null) ...[
                       const SizedBox(height: 10),
                       Row(
                         children: [
                           if (log.oldValue != null)
                             Expanded(
-                              child: _Pill(label: 'Before', value: log.oldValue!,
+                              child: _Pill(
+                                  label: 'Before',
+                                  value: log.oldValue!,
                                   color: const Color(0xFFDC2626)),
                             ),
-                          if (log.oldValue != null && log.newValue != null)
+                          if (log.oldValue != null &&
+                              log.newValue != null)
                             const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 6),
-                              child: Icon(Icons.arrow_forward_rounded,
-                                  size: 14, color: Color(0xFF9CA3AF)),
+                              padding:
+                                  EdgeInsets.symmetric(horizontal: 6),
+                              child: Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: 14,
+                                  color: Color(0xFF9CA3AF)),
                             ),
                           if (log.newValue != null)
                             Expanded(
-                              child: _Pill(label: 'After', value: log.newValue!,
+                              child: _Pill(
+                                  label: 'After',
+                                  value: log.newValue!,
                                   color: const Color(0xFF16A34A)),
                             ),
                         ],
@@ -676,7 +769,8 @@ class _AuditLogCard extends StatelessWidget {
                     ],
 
                     // Reason
-                    if (log.reason != null && log.reason!.isNotEmpty) ...[
+                    if (log.reason != null &&
+                        log.reason!.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Container(
                         width: double.infinity,
@@ -685,7 +779,8 @@ class _AuditLogCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: const Color(0xFFF9FAFB),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                          border: Border.all(
+                              color: const Color(0xFFE5E7EB)),
                         ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -733,7 +828,8 @@ class _Pill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: color.withOpacity(0.08),
         borderRadius: BorderRadius.circular(8),
