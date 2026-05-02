@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../helpers/database_helper.dart';
 import '../../services/auth_service.dart';
+import '../../services/firestore_sync_service.dart';
 import '../../models/models.dart';
 import '../scanner_screen.dart';
 import '../records_screen.dart';
@@ -19,12 +21,11 @@ class AdminHomeScreen extends StatefulWidget {
   State<AdminHomeScreen> createState() => _AdminHomeScreenState();
 }
 
-// ── FIX: add WidgetsBindingObserver so stats refresh when the app resumes ──
 class _AdminHomeScreenState extends State<AdminHomeScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-// ───────────────────────────────────────────────────────────────────────────
   final DatabaseHelper _db = DatabaseHelper();
   final AuthService _auth = AuthService();
+  final FirestoreSyncService _syncService = FirestoreSyncService();
 
   int _totalStudents = 0;
   double _totalCollected = 0;
@@ -34,11 +35,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
+  // Firestore stream subscriptions for real-time stat updates
+  StreamSubscription? _paymentsStreamSub;
+  StreamSubscription? _studentsStreamSub;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this); // ← FIX: register observer
+    WidgetsBinding.instance.addObserver(this);
     _loadStats();
+    _subscribeToFirestoreStreams();
+
     _pulseController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
@@ -50,23 +57,63 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this); // ← FIX: unregister
+    WidgetsBinding.instance.removeObserver(this);
+    _paymentsStreamSub?.cancel();
+    _studentsStreamSub?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
 
-  // ── FIX: reload stats every time the app comes back to the foreground ────
-  // This covers two scenarios:
-  //   1. The user switches to another app, another teacher records a payment
-  //      on a different device (sync happens in background), then returns.
-  //   2. The user navigates away to a sub-screen and back (already handled by
-  //      the existing _loadStats() calls after Navigator.push, but this adds
-  //      an extra safety net for the app-lifecycle case).
+  /// Listens to Firestore real-time streams. Whenever a payment or student
+  /// changes on ANY device, we upsert into local SQLite then reload stats.
+  void _subscribeToFirestoreStreams() {
+    // Listen to payments stream — fires when any device adds/edits a payment
+    _paymentsStreamSub = _syncService.paymentsStream().listen(
+      (remotePayments) async {
+        // Upsert each remote payment into local SQLite so stats stay accurate
+        for (final p in remotePayments) {
+          if (p.transactionNumber.isNotEmpty) {
+            await _db.upsertTransactionFromFirestore({
+              'transactionNumber': p.transactionNumber,
+              'studentId': p.studentId,
+              'amount': p.amount,
+              'note': p.note,
+              'createdAt': p.createdAt,
+              'processedByUid': p.processedByUid,
+              'processedByName': p.processedByName,
+            });
+          }
+        }
+        // Reload stats after syncing remote data into SQLite
+        await _loadStats();
+      },
+      onError: (_) {
+        // Offline or stream error — silently ignore, local data still shows
+      },
+    );
+
+    // Listen to students stream — fires when any device registers a student
+    _studentsStreamSub = _syncService.studentsStream().listen(
+      (remoteStudents) async {
+        for (final s in remoteStudents) {
+          await _db.upsertStudentFromFirestore({
+            'lrn': s.lrn,
+            'name': s.name,
+            'grade': s.grade,
+            'createdAt': s.createdAt,
+            'isTemp': s.isTemp,
+          });
+        }
+        await _loadStats();
+      },
+      onError: (_) {},
+    );
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) _loadStats();
   }
-  // ─────────────────────────────────────────────────────────────────────────
 
   Future<void> _loadStats() async {
     final count = await _db.getTotalStudentCount();
@@ -443,21 +490,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _headerBtn(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(icon, color: Colors.white, size: 20),
       ),
     );
   }
