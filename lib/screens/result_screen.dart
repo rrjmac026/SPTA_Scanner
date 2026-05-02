@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../helpers/database_helper.dart';
 import '../models/models.dart';
-import '../services/firestore_service.dart'; // ← NEW
+import '../services/firestore_sync_service.dart';
+import '../services/firestore_service.dart';
 import 'scanner_screen.dart';
 import 'widgets/payment_dialog.dart';
 import 'widgets/status_banner.dart';
@@ -26,7 +28,8 @@ class ResultScreen extends StatefulWidget {
 class _ResultScreenState extends State<ResultScreen>
     with SingleTickerProviderStateMixin {
   final DatabaseHelper _db = DatabaseHelper();
-  final FirestoreService _firestoreService = FirestoreService(); // ← NEW
+  final FirestoreService _firestoreService = FirestoreService();
+  final FirestoreSyncService _syncService = FirestoreSyncService();
 
   bool _isLoading = true;
   bool _isSavingPayment = false;
@@ -36,6 +39,18 @@ class _ResultScreenState extends State<ResultScreen>
   String _selectedGrade = 'Grade 7';
   bool _isNewStudent = false;
   bool _tempLinkChecked = false;
+
+  // ── Live stream subscriptions ────────────────────────────────────────────
+  // We subscribe to BOTH the students stream and the payments stream (same as
+  // RecordsScreen / AdminHomeScreen) so that any payment recorded on another
+  // device is immediately reflected here.
+  StreamSubscription<List<Student>>? _studentsSub;
+  StreamSubscription<List<Payment>>? _paymentsSub;
+
+  // In-memory caches that are rebuilt whenever either stream fires.
+  List<Student> _allStudents = [];
+  List<Payment> _allPayments = [];
+  double _totalFee = 750;
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -58,54 +73,169 @@ class _ResultScreenState extends State<ResultScreen>
             CurvedAnimation(
                 parent: _animController, curve: Curves.easeOut));
     _animController.forward();
-    _loadOrCreateStudent();
+
+    _loadFeeAndSubscribe();
   }
 
   @override
   void dispose() {
+    _studentsSub?.cancel();
+    _paymentsSub?.cancel();
     _animController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadOrCreateStudent() async {
-    setState(() => _isLoading = true);
+  // ── Step 1: load fee, then subscribe to live streams ─────────────────────
+  Future<void> _loadFeeAndSubscribe() async {
+    _totalFee = await _db.getTotalFee();
+    _subscribeToStreams();
+  }
 
-    // ── FIX: Pull latest from Firestore before reading SQLite ──────────────
-    // This ensures a scan always reflects payments made on other devices.
-    // syncAndGetStudentPaymentInfo() silently falls through to local data
-    // when offline, so the app keeps working without a connection.
-    final info =
-        await _firestoreService.syncAndGetStudentPaymentInfo(widget.lrn);
-    // ─────────────────────────────────────────────────────────────────────
+  /// Mirrors the pattern used in RecordsScreen and AdminHomeScreen.
+  /// Both streams upsert into SQLite as they arrive, then rebuild _info in
+  /// memory — so the displayed balance is always consistent with Firestore.
+  void _subscribeToStreams() {
+    _studentsSub = _syncService.studentsStream().listen(
+      (students) async {
+        if (!mounted) return;
+        _allStudents = students;
 
-    if (info == null) {
-      if (!_tempLinkChecked) {
-        _tempLinkChecked = true;
-        final candidates = await _db.findTempCandidates(widget.name);
-        if (candidates.isNotEmpty && mounted) {
-          setState(() => _isLoading = false);
-          await Future.delayed(const Duration(milliseconds: 400));
-          if (!mounted) return;
-          final chosen = await LinkTempSheet.show(
-            context,
-            scannedName: widget.name,
-            scannedLrn: widget.lrn,
-            candidates: candidates,
-          );
-          if (chosen != null && mounted) {
-            await _linkTempRecord(chosen);
-            return;
+        // Keep local SQLite fresh so exports / other screens stay consistent.
+        for (final s in students) {
+          await _db.upsertStudentFromFirestore({
+            'lrn': s.lrn,
+            'name': s.name,
+            'grade': s.grade,
+            'createdAt': s.createdAt,
+            'isTemp': s.isTemp,
+          });
+        }
+
+        _rebuildInfo();
+      },
+      onError: (_) => _fallbackToOneShot(),
+    );
+
+    _paymentsSub = _syncService.paymentsStream().listen(
+      (payments) async {
+        if (!mounted) return;
+        _allPayments = payments;
+
+        // Upsert every payment into SQLite so local queries stay accurate.
+        for (final p in payments) {
+          if (p.transactionNumber.isNotEmpty) {
+            await _db.upsertTransactionFromFirestore({
+              'transactionNumber': p.transactionNumber,
+              'studentId': p.studentId,
+              'amount': p.amount,
+              'note': p.note,
+              'createdAt': p.createdAt,
+              'processedByUid': p.processedByUid,
+              'processedByName': p.processedByName,
+            });
           }
         }
-      }
-      if (mounted) {
+
+        _rebuildInfo();
+      },
+      onError: (_) => _fallbackToOneShot(),
+    );
+  }
+
+  /// Builds [_info] from the in-memory student + payment caches, filtered to
+  /// the LRN that was scanned. Called after every stream emission.
+  void _rebuildInfo() {
+    if (!mounted) return;
+
+    // Find the student record for the scanned LRN.
+    Student? student;
+    try {
+      student = _allStudents.firstWhere((s) => s.lrn == widget.lrn);
+    } catch (_) {
+      student = null;
+    }
+
+    if (student == null) {
+      // Student not found in Firestore yet — could be truly new or offline.
+      // Check for temp-link candidates once, then fall back to "new student".
+      if (!_tempLinkChecked && !_isNewStudent) {
+        _handleMissingStudent();
+      } else {
         setState(() {
-          _isNewStudent = true;
           _isLoading = false;
+          // Keep _isNewStudent as-is; don't flip it back on stream updates.
         });
       }
       return;
     }
+
+    // Filter payments for this student only.
+    final payments = _allPayments
+        .where((p) => p.studentId == student!.id)
+        .toList()
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+    final amountPaid = payments.fold<double>(0, (s, p) => s + p.amount);
+
+    final info = StudentPaymentInfo(
+      student: student,
+      totalFee: _totalFee,
+      amountPaid: amountPaid,
+      payments: payments,
+    );
+
+    setState(() {
+      _info = info;
+      _isNewStudent = false;
+      _isLoading = false;
+    });
+  }
+
+  /// Called when the scanned LRN is not found in the live stream.
+  /// Checks for walk-in (temp) candidates; if none, marks as new student.
+  Future<void> _handleMissingStudent() async {
+    _tempLinkChecked = true;
+
+    final candidates = await _db.findTempCandidates(widget.name);
+    if (candidates.isNotEmpty && mounted) {
+      setState(() => _isLoading = false);
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (!mounted) return;
+
+      final chosen = await LinkTempSheet.show(
+        context,
+        scannedName: widget.name,
+        scannedLrn: widget.lrn,
+        candidates: candidates,
+      );
+
+      if (chosen != null && mounted) {
+        await _linkTempRecord(chosen);
+        return;
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _isNewStudent = true;
+        _isLoading = false;
+      });
+    }
+  }
+
+  /// Fallback used when Firestore streams fail (offline device).
+  /// Performs a single SQLite read — the same behaviour as before.
+  Future<void> _fallbackToOneShot() async {
+    final info =
+        await _firestoreService.syncAndGetStudentPaymentInfo(widget.lrn);
+
+    if (info == null) {
+      if (!_tempLinkChecked) {
+        await _handleMissingStudent();
+      }
+      return;
+    }
+
     if (mounted) {
       setState(() {
         _info = info;
@@ -113,6 +243,16 @@ class _ResultScreenState extends State<ResultScreen>
         _isLoading = false;
       });
     }
+  }
+
+  // ── Kept for post-payment refresh and initial registration ───────────────
+
+  /// Still used after _registerAndContinue() so the grade selector clears
+  /// and transitions to the payment view.  The live stream will have already
+  /// updated _info by the time this resolves, but calling _rebuildInfo()
+  /// explicitly guarantees the UI flips without waiting for the next emission.
+  Future<void> _refreshFromCache() async {
+    _rebuildInfo();
   }
 
   Future<void> _linkTempRecord(StudentPaymentInfo chosen) async {
@@ -125,7 +265,8 @@ class _ResultScreenState extends State<ResultScreen>
       grade: chosen.student.grade,
     );
 
-    // Use sync version here too so the linked record is immediately fresh.
+    // The live stream will pick up the change shortly; do one explicit rebuild
+    // so the UI doesn't sit blank while waiting.
     final info =
         await _firestoreService.syncAndGetStudentPaymentInfo(widget.lrn);
     if (mounted) {
@@ -165,18 +306,26 @@ class _ResultScreenState extends State<ResultScreen>
 
   Future<void> _registerAndContinue() async {
     final now = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
+    final currentUser = AuthService().currentUser;
     final student = Student(
       name: widget.name,
       lrn: widget.lrn,
       grade: _selectedGrade,
       createdAt: now,
     );
-    final id = await _db.insertStudent(student);
+    final id = await _db.insertStudent(
+      student,
+      processedByUid: currentUser?.uid ?? '',
+      processedByName: currentUser?.name ?? '',
+    );
     if (id == null) {
-      await _loadOrCreateStudent();
+      // Already exists — just rebuild from what we have.
+      await _refreshFromCache();
       return;
     }
-    await _loadOrCreateStudent();
+    // The Firestore stream will push the new student back to us; rebuild now
+    // from SQLite so the grade selector disappears immediately.
+    await _refreshFromCache();
   }
 
   Future<void> _showPaymentDialog() async {
@@ -198,7 +347,9 @@ class _ResultScreenState extends State<ResultScreen>
         processedByName: currentUser?.name ?? '',
       ));
 
-      await _loadOrCreateStudent();
+      // The live stream will update _info; just clear the saving flag here.
+      // We do one explicit rebuild so the balance flips without waiting.
+      await _refreshFromCache();
       setState(() => _isSavingPayment = false);
 
       if (mounted) {
@@ -457,7 +608,7 @@ class _ResultScreenState extends State<ResultScreen>
               payments: info.payments,
               student: info.student,
               totalFee: info.totalFee,
-              onEdited: _loadOrCreateStudent,
+              onEdited: _refreshFromCache,
             ),
             const SizedBox(height: 14),
           ],
@@ -559,6 +710,20 @@ class _ResultScreenState extends State<ResultScreen>
         title: const Text('Scan Result',
             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
         actions: [
+          // Live indicator dot — same as RecordsScreen
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Center(
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF4ADE80),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.qr_code_scanner_rounded),
             onPressed: () => Navigator.pushReplacement(
