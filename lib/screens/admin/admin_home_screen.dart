@@ -27,15 +27,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   final AuthService _auth = AuthService();
   final FirestoreSyncService _syncService = FirestoreSyncService();
 
+  // ── Stats displayed in the header ────────────────────────────────────────
   int _totalStudents = 0;
   double _totalCollected = 0;
   double _totalFee = 750;
   int _fullyPaidCount = 0;
 
+  // ── In-memory caches from Firestore streams ───────────────────────────────
+  // Keeping both lists lets us recompute all stats purely in memory whenever
+  // either stream emits, so no stale SQLite reads can produce wrong totals.
+  List<Payment> _allPayments = [];
+  List<Student> _allStudents = [];
+
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
-  // Firestore stream subscriptions for real-time stat updates
   StreamSubscription? _paymentsStreamSub;
   StreamSubscription? _studentsStreamSub;
 
@@ -43,7 +49,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _loadStats();
+    _loadFee();
     _subscribeToFirestoreStreams();
 
     _pulseController = AnimationController(
@@ -64,13 +70,58 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
     super.dispose();
   }
 
-  /// Listens to Firestore real-time streams. Whenever a payment or student
-  /// changes on ANY device, we upsert into local SQLite then reload stats.
+  // ── Load the configurable fee once (it changes rarely) ───────────────────
+  Future<void> _loadFee() async {
+    final fee = await _db.getTotalFee();
+    if (mounted) {
+      setState(() => _totalFee = fee);
+      _recomputeStats();
+    }
+  }
+
+  /// Recompute all header stats purely from the in-memory lists.
+  /// Called after every stream emission and after the fee is loaded.
+  void _recomputeStats() {
+    if (!mounted) return;
+
+    // Total collected = sum of ALL payment amounts currently in the stream.
+    // Because edited payments are pushed to Firestore with their new amount,
+    // the stream always contains the latest value — no SQLite read needed.
+    final totalCollected =
+        _allPayments.fold<double>(0, (sum, p) => sum + p.amount);
+
+    // Build a payment-per-student map to determine fully-paid count.
+    final Map<int, double> paidByStudent = {};
+    for (final p in _allPayments) {
+      paidByStudent[p.studentId] =
+          (paidByStudent[p.studentId] ?? 0) + p.amount;
+    }
+
+    final fullyPaid = _allStudents
+        .where((s) => (paidByStudent[s.id] ?? 0) >= _totalFee)
+        .length;
+
+    setState(() {
+      _totalStudents = _allStudents.length;
+      _totalCollected = totalCollected;
+      _fullyPaidCount = fullyPaid;
+    });
+  }
+
+  /// Subscribes to the two Firestore real-time streams.
+  ///
+  /// Payments stream: fires on every add OR edit (because `upsertPayment`
+  /// uses `SetOptions(merge: true)`, which triggers a snapshot update).
+  /// We store the full list and recompute stats in memory — this is the key
+  /// fix: we never call `getTotalCollected()` from SQLite for the header card.
+  ///
+  /// Students stream: fires when any device registers a student.
   void _subscribeToFirestoreStreams() {
-    // Listen to payments stream — fires when any device adds/edits a payment
     _paymentsStreamSub = _syncService.paymentsStream().listen(
       (remotePayments) async {
-        // Upsert each remote payment into local SQLite so stats stay accurate
+        _allPayments = remotePayments;
+
+        // Also upsert into SQLite so Records / exports stay consistent.
         for (final p in remotePayments) {
           if (p.transactionNumber.isNotEmpty) {
             await _db.upsertTransactionFromFirestore({
@@ -84,17 +135,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
             });
           }
         }
-        // Reload stats after syncing remote data into SQLite
-        await _loadStats();
+
+        _recomputeStats();
       },
       onError: (_) {
-        // Offline or stream error — silently ignore, local data still shows
+        // Offline — fall back to a one-time SQLite read.
+        _fallbackLoadStats();
       },
     );
 
-    // Listen to students stream — fires when any device registers a student
     _studentsStreamSub = _syncService.studentsStream().listen(
       (remoteStudents) async {
+        _allStudents = remoteStudents;
+
         for (final s in remoteStudents) {
           await _db.upsertStudentFromFirestore({
             'lrn': s.lrn,
@@ -104,18 +157,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
             'isTemp': s.isTemp,
           });
         }
-        await _loadStats();
+
+        _recomputeStats();
       },
-      onError: (_) {},
+      onError: (_) {
+        _fallbackLoadStats();
+      },
     );
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _loadStats();
-  }
-
-  Future<void> _loadStats() async {
+  /// Fallback: read everything from local SQLite when Firestore is unavailable.
+  Future<void> _fallbackLoadStats() async {
     final count = await _db.getTotalStudentCount();
     final collected = await _db.getTotalCollected();
     final fee = await _db.getTotalFee();
@@ -129,6 +181,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
         _fullyPaidCount = fullyPaid;
       });
     }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // When the app comes back to foreground, reload the fee in case it changed,
+    // then recompute. Streams will have resumed automatically.
+    if (state == AppLifecycleState.resumed) _loadFee();
   }
 
   Future<void> _signOut() async {
@@ -330,7 +389,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                                 context,
                                 MaterialPageRoute(
                                     builder: (_) => const ScannerScreen()));
-                            _loadStats();
+                            // No manual reload needed — streams update stats.
                           },
                           borderRadius: BorderRadius.circular(20),
                           child: Padding(
@@ -402,13 +461,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                             icon: Icons.receipt_long_rounded,
                             label: 'All Records',
                             color: const Color(0xFF16A34A),
-                            onTap: () async {
-                              await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (_) => const RecordsScreen()));
-                              _loadStats();
-                            },
+                            onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const RecordsScreen())),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -417,14 +473,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                             icon: Icons.add_card_rounded,
                             label: 'Add Transaction',
                             color: const Color(0xFF0D9488),
-                            onTap: () async {
-                              await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (_) =>
-                                          const AddTransactionScreen()));
-                              _loadStats();
-                            },
+                            onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const AddTransactionScreen())),
                           ),
                         ),
                       ],
@@ -440,14 +493,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                             icon: Icons.people_rounded,
                             label: 'Manage Users',
                             color: const Color(0xFF7C3AED),
-                            onTap: () async {
-                              await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (_) =>
-                                          const ManageUsersScreen()));
-                              _loadStats();
-                            },
+                            onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const ManageUsersScreen())),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -461,7 +511,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                                   context,
                                   MaterialPageRoute(
                                       builder: (_) => const SettingsScreen()));
-                              _loadStats();
+                              // Fee may have changed — reload it.
+                              _loadFee();
                             },
                           ),
                         ),
@@ -476,13 +527,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
                       label: 'Audit Log',
                       color: const Color(0xFFB45309),
                       fullWidth: true,
-                      onTap: () {
-                        Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) =>
-                                    const AdminAuditLogScreen()));
-                      },
+                      onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const AdminAuditLogScreen())),
                     ),
                   ],
                 ),
