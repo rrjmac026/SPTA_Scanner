@@ -1,3 +1,4 @@
+import 'dart:async'; // ← NEW
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
@@ -6,9 +7,10 @@ import '../../helpers/database_helper.dart';
 import '../../helpers/export_helper.dart';
 import '../../models/models.dart';
 import '../../services/auth_service.dart';
+import '../../services/firestore_service.dart'; // ← NEW
 import '../widgets/student_card.dart';
 import '../widgets/export_bottom_sheet.dart';
-import '../../widgets/sync_status_badge.dart'; // ← ADD THIS IMPORT
+import '../../widgets/sync_status_badge.dart';
 
 /// Records screen for teachers — only shows students they personally processed.
 class TeacherRecordsScreen extends StatefulWidget {
@@ -21,12 +23,17 @@ class TeacherRecordsScreen extends StatefulWidget {
 class _TeacherRecordsScreenState extends State<TeacherRecordsScreen> {
   final DatabaseHelper _db = DatabaseHelper();
   final AuthService _auth = AuthService();
+  final FirestoreService _firestoreService = FirestoreService(); // ← NEW
 
   List<StudentPaymentInfo> _infos = [];
   bool _isLoading = true;
   bool _isExporting = false;
   String _searchQuery = '';
   String _selectedStatusFilter = 'All';
+
+  // ── FIX: live stream subscription ───────────────────────────────────────
+  StreamSubscription<List<StudentPaymentInfo>>? _recordsSub;
+  // ─────────────────────────────────────────────────────────────────────────
 
   final List<String> _statusFilters = [
     'All', 'Fully Paid', 'Partial', 'Unpaid'
@@ -35,10 +42,39 @@ class _TeacherRecordsScreenState extends State<TeacherRecordsScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _subscribeToRecords();
   }
 
-  Future<void> _load() async {
+  @override
+  void dispose() {
+    _recordsSub?.cancel(); // ← always cancel streams
+    super.dispose();
+  }
+
+  // ── FIX: subscribe to live Firestore stream ──────────────────────────────
+  // teacherRecordsStream() listens to the teacher's transaction docs in
+  // Firestore and re-syncs SQLite on every change, so the list updates in
+  // real-time when another device records a payment for one of their students.
+  void _subscribeToRecords() {
+    final uid = _auth.currentUser?.uid ?? '';
+    _recordsSub = _firestoreService
+        .teacherRecordsStream(uid)
+        .listen((infos) {
+      if (mounted) {
+        setState(() {
+          _infos = infos;
+          _isLoading = false;
+        });
+      }
+    }, onError: (_) {
+      // Stream error (e.g. permission denied) — fall back to local SQLite.
+      _loadFromLocal();
+    });
+  }
+
+  /// Fallback: read directly from SQLite. Used when offline or on stream
+  /// error. Also wired to the manual refresh button.
+  Future<void> _loadFromLocal() async {
     setState(() => _isLoading = true);
     final uid = _auth.currentUser?.uid ?? '';
     final infos = await _db.getStudentPaymentInfosByProcessor(uid);
@@ -229,10 +265,7 @@ class _TeacherRecordsScreenState extends State<TeacherRecordsScreen> {
           ],
         ),
         actions: [
-          // ── Sync status badge ──────────────────────────────────────────
-          // Shows live upload status; orange + count = pending, green = all synced
           const SyncStatusBadge(),
-
           if (_isExporting)
             const Padding(
               padding: EdgeInsets.all(16),
@@ -247,9 +280,10 @@ class _TeacherRecordsScreenState extends State<TeacherRecordsScreen> {
               icon: const Icon(Icons.download_rounded),
               onPressed: _infos.isEmpty ? null : _showExportOptions,
             ),
+          // Refresh still available as a manual fallback (e.g. while offline)
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
-            onPressed: _load,
+            onPressed: _loadFromLocal,
           ),
         ],
       ),
@@ -371,7 +405,7 @@ class _TeacherRecordsScreenState extends State<TeacherRecordsScreen> {
                         itemBuilder: (_, i) => StudentCard(
                           info: filtered[i],
                           index: i,
-                          onRecordChanged: _load,
+                          onRecordChanged: _loadFromLocal,
                         ),
                       ),
           ),

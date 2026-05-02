@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../helpers/database_helper.dart';
 import '../models/models.dart';
+import '../services/firestore_service.dart'; // ← NEW
 import 'scanner_screen.dart';
 import 'widgets/payment_dialog.dart';
 import 'widgets/status_banner.dart';
@@ -25,6 +26,7 @@ class ResultScreen extends StatefulWidget {
 class _ResultScreenState extends State<ResultScreen>
     with SingleTickerProviderStateMixin {
   final DatabaseHelper _db = DatabaseHelper();
+  final FirestoreService _firestoreService = FirestoreService(); // ← NEW
 
   bool _isLoading = true;
   bool _isSavingPayment = false;
@@ -67,7 +69,15 @@ class _ResultScreenState extends State<ResultScreen>
 
   Future<void> _loadOrCreateStudent() async {
     setState(() => _isLoading = true);
-    final info = await _db.getStudentPaymentInfo(widget.lrn);
+
+    // ── FIX: Pull latest from Firestore before reading SQLite ──────────────
+    // This ensures a scan always reflects payments made on other devices.
+    // syncAndGetStudentPaymentInfo() silently falls through to local data
+    // when offline, so the app keeps working without a connection.
+    final info =
+        await _firestoreService.syncAndGetStudentPaymentInfo(widget.lrn);
+    // ─────────────────────────────────────────────────────────────────────
+
     if (info == null) {
       if (!_tempLinkChecked) {
         _tempLinkChecked = true;
@@ -115,7 +125,9 @@ class _ResultScreenState extends State<ResultScreen>
       grade: chosen.student.grade,
     );
 
-    final info = await _db.getStudentPaymentInfo(widget.lrn);
+    // Use sync version here too so the linked record is immediately fresh.
+    final info =
+        await _firestoreService.syncAndGetStudentPaymentInfo(widget.lrn);
     if (mounted) {
       setState(() {
         _info = info;
@@ -445,7 +457,7 @@ class _ResultScreenState extends State<ResultScreen>
               payments: info.payments,
               student: info.student,
               totalFee: info.totalFee,
-              onEdited: _loadOrCreateStudent, // refresh everything on edit
+              onEdited: _loadOrCreateStudent,
             ),
             const SizedBox(height: 14),
           ],

@@ -16,8 +16,10 @@ class TeacherHomeScreen extends StatefulWidget {
   State<TeacherHomeScreen> createState() => _TeacherHomeScreenState();
 }
 
+// ── FIX: add WidgetsBindingObserver so stats refresh when the app resumes ──
 class _TeacherHomeScreenState extends State<TeacherHomeScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+// ───────────────────────────────────────────────────────────────────────────
   final DatabaseHelper _db = DatabaseHelper();
   final AuthService _auth = AuthService();
 
@@ -32,6 +34,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // ← FIX: register observer
     _loadStats();
     _pulseController = AnimationController(
       duration: const Duration(seconds: 2),
@@ -44,9 +47,17 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this); // ← FIX: unregister
     _pulseController.dispose();
     super.dispose();
   }
+
+  // ── FIX: reload stats every time the app comes back to the foreground ────
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _loadStats();
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   Future<void> _loadStats() async {
     final uid = _auth.currentUser?.uid ?? '';

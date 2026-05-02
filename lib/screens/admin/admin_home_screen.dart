@@ -9,7 +9,7 @@ import '../add_transaction_screen.dart';
 import '../login_screen.dart';
 import 'manage_users_screen.dart';
 import '../../widgets/app_logo.dart';
-import '../audit_log_screens.dart'; // <-- add this import
+import '../audit_log_screens.dart';
 import '../../widgets/sync_status_badge.dart';
 
 class AdminHomeScreen extends StatefulWidget {
@@ -19,8 +19,10 @@ class AdminHomeScreen extends StatefulWidget {
   State<AdminHomeScreen> createState() => _AdminHomeScreenState();
 }
 
+// ── FIX: add WidgetsBindingObserver so stats refresh when the app resumes ──
 class _AdminHomeScreenState extends State<AdminHomeScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+// ───────────────────────────────────────────────────────────────────────────
   final DatabaseHelper _db = DatabaseHelper();
   final AuthService _auth = AuthService();
 
@@ -35,6 +37,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // ← FIX: register observer
     _loadStats();
     _pulseController = AnimationController(
       duration: const Duration(seconds: 2),
@@ -47,9 +50,23 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this); // ← FIX: unregister
     _pulseController.dispose();
     super.dispose();
   }
+
+  // ── FIX: reload stats every time the app comes back to the foreground ────
+  // This covers two scenarios:
+  //   1. The user switches to another app, another teacher records a payment
+  //      on a different device (sync happens in background), then returns.
+  //   2. The user navigates away to a sub-screen and back (already handled by
+  //      the existing _loadStats() calls after Navigator.push, but this adds
+  //      an extra safety net for the app-lifecycle case).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _loadStats();
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   Future<void> _loadStats() async {
     final count = await _db.getTotalStudentCount();

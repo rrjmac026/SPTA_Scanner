@@ -1,3 +1,4 @@
+import 'dart:async'; // ← NEW
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -5,6 +6,7 @@ import '../helpers/database_helper.dart';
 import '../models/models.dart';
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
+import '../services/firestore_service.dart'; // ← NEW
 import 'edit_payment_sheet.dart';
 
 class StudentDetailScreen extends StatefulWidget {
@@ -23,6 +25,11 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
 
+  // ── FIX: live Firestore stream ───────────────────────────────────────────
+  final FirestoreService _firestoreService = FirestoreService();
+  StreamSubscription<StudentPaymentInfo?>? _infoSub;
+  // ─────────────────────────────────────────────────────────────────────────
+
   @override
   void initState() {
     super.initState();
@@ -35,17 +42,33 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
         Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero).animate(
             CurvedAnimation(parent: _animController, curve: Curves.easeOut));
     _animController.forward();
+
+    // ── FIX: subscribe to live updates ──────────────────────────────────
+    // studentPaymentInfoStream() listens to the Firestore student doc and
+    // re-syncs into SQLite on every change, so payment history updates in
+    // real-time without the user pressing refresh.
+    _infoSub = _firestoreService
+        .studentPaymentInfoStream(_info.student.lrn)
+        .listen((updated) {
+      if (updated != null && mounted) {
+        setState(() => _info = updated);
+      }
+    });
+    // ─────────────────────────────────────────────────────────────────────
   }
 
   @override
   void dispose() {
+    _infoSub?.cancel(); // ← NEW: always cancel streams
     _animController.dispose();
     super.dispose();
   }
 
+  /// Manual refresh — still useful as a fallback while offline, or when the
+  /// user wants to force an immediate re-fetch.
   Future<void> _refresh() async {
-    final db = DatabaseHelper();
-    final updated = await db.getStudentPaymentInfo(_info.student.lrn);
+    final updated = await _firestoreService
+        .syncAndGetStudentPaymentInfo(_info.student.lrn);
     if (updated != null && mounted) {
       setState(() => _info = updated);
     }
