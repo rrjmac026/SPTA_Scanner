@@ -3,8 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../models/payment.dart';
 import '../../models/student.dart';
+import '../../models/app_user.dart';
+import '../../services/auth_service.dart';
+import '../edit_payment_sheet.dart';
 
 /// Scrollable list of individual payment entries shown in [ResultScreen].
+/// Supports role-based edit access — same rules as [StudentDetailScreen].
 class PaymentHistoryCard extends StatelessWidget {
   final List<Payment> payments;
   final Student student;
@@ -27,8 +31,19 @@ class PaymentHistoryCard extends StatelessWidget {
     }
   }
 
+  bool _canEdit(Payment p, AppUser? user) {
+    if (user == null) return false;
+    if (user.role == UserRole.admin) return true;
+    if (user.role == UserRole.teacher) {
+      return p.processedByUid == user.uid;
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final user = AuthService().currentUser;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -42,6 +57,7 @@ class PaymentHistoryCard extends StatelessWidget {
       ),
       child: Column(
         children: [
+          // ── Header ────────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
             child: Row(
@@ -61,64 +77,86 @@ class PaymentHistoryCard extends StatelessWidget {
                         color: Color(0xFF14532D),
                         fontSize: 14,
                         fontWeight: FontWeight.w700)),
+                const Spacer(),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '₱${payments.fold<double>(0, (s, p) => s + p.amount).toStringAsFixed(2)} total',
+                    style: const TextStyle(
+                        color: Color(0xFF16A34A),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700),
+                  ),
+                ),
               ],
             ),
           ),
           const Divider(height: 1),
+
+          // ── Payment rows ──────────────────────────────────────────────
           ...payments.asMap().entries.map((e) {
             final i = e.key;
             final p = e.value;
             final isLast = i == payments.length - 1;
             final hasTxn = p.transactionNumber.isNotEmpty;
+            final canEdit = _canEdit(p, user);
+
             return Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7),
-                          borderRadius: BorderRadius.circular(10),
+                InkWell(
+                  onLongPress: hasTxn
+                      ? () {
+                          Clipboard.setData(
+                              ClipboardData(text: p.transactionNumber));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Copied: ${p.transactionNumber}'),
+                              duration: const Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: const Color(0xFF16A34A),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                              margin: const EdgeInsets.all(16),
+                            ),
+                          );
+                        }
+                      : null,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Index badge ─────────────────────────────────
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDCFCE7),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(
+                            child: Text('${i + 1}',
+                                style: const TextStyle(
+                                    color: Color(0xFF16A34A),
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12)),
+                          ),
                         ),
-                        child: Center(
-                          child: Text('${i + 1}',
-                              style: const TextStyle(
-                                  color: Color(0xFF16A34A),
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 12)),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (hasTxn)
-                              GestureDetector(
-                                onLongPress: () {
-                                  Clipboard.setData(
-                                      ClipboardData(text: p.transactionNumber));
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                          'Copied: ${p.transactionNumber}'),
-                                      duration: const Duration(seconds: 2),
-                                      behavior: SnackBarBehavior.floating,
-                                      backgroundColor:
-                                          const Color(0xFF16A34A),
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12)),
-                                      margin: const EdgeInsets.all(16),
-                                    ),
-                                  );
-                                },
-                                child: Container(
+                        const SizedBox(width: 12),
+
+                        // ── Details ─────────────────────────────────────
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (hasTxn) ...[
+                                Container(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
@@ -143,27 +181,123 @@ class PaymentHistoryCard extends StatelessWidget {
                                               fontWeight: FontWeight.w700,
                                               fontFamily: 'monospace',
                                               letterSpacing: 0.5)),
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.copy_rounded,
+                                          size: 9,
+                                          color: Color(0xFF3B82F6)),
                                     ],
                                   ),
                                 ),
+                                const SizedBox(height: 5),
+                              ],
+                              Text(_formatDate(p.createdAt),
+                                  style: const TextStyle(
+                                      color: Color(0xFF64748B), fontSize: 11)),
+                              if (p.processedByName.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    Icon(Icons.person_rounded,
+                                        size: 10, color: Colors.grey[400]),
+                                    const SizedBox(width: 3),
+                                    Text(p.processedByName,
+                                        style: TextStyle(
+                                            color: Colors.grey[400],
+                                            fontSize: 10)),
+                                  ],
+                                ),
+                              ],
+                              if (p.note.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    Icon(Icons.notes_rounded,
+                                        size: 11, color: Colors.grey[400]),
+                                    const SizedBox(width: 3),
+                                    Text(p.note,
+                                        style: TextStyle(
+                                            color: Colors.grey[400],
+                                            fontSize: 10)),
+                                  ],
+                                ),
+                              ],
+                              // ── Sync indicator ───────────────────────
+                              const SizedBox(height: 3),
+                              Row(
+                                children: [
+                                  Icon(
+                                    p.synced
+                                        ? Icons.cloud_done_rounded
+                                        : Icons.cloud_off_rounded,
+                                    size: 11,
+                                    color: p.synced
+                                        ? const Color(0xFF16A34A)
+                                        : Colors.grey[400],
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    p.synced ? 'Synced' : 'Pending sync',
+                                    style: TextStyle(
+                                        fontSize: 9,
+                                        color: p.synced
+                                            ? const Color(0xFF16A34A)
+                                            : Colors.grey[400]),
+                                  ),
+                                ],
                               ),
-                            if (hasTxn) const SizedBox(height: 4),
-                            Text(_formatDate(p.createdAt),
-                                style: const TextStyle(
-                                    color: Color(0xFF64748B), fontSize: 11)),
-                            if (p.note.isNotEmpty)
-                              Text(p.note,
-                                  style: TextStyle(
-                                      color: Colors.grey[400], fontSize: 10)),
+                            ],
+                          ),
+                        ),
+
+                        // ── Amount + edit button ─────────────────────────
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              '₱${p.amount.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                  color: Color(0xFF16A34A),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14),
+                            ),
+                            const SizedBox(height: 2),
+                            Text('payment',
+                                style: TextStyle(
+                                    color: Colors.grey[400], fontSize: 9)),
+                            if (canEdit) ...[
+                              const SizedBox(height: 8),
+                              GestureDetector(
+                                onTap: () async {
+                                  final edited = await EditPaymentSheet.show(
+                                    context,
+                                    payment: p,
+                                    student: student,
+                                    totalFee: totalFee,
+                                  );
+                                  if (edited == true) onEdited();
+                                },
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(9),
+                                    border: Border.all(
+                                        color: const Color(0xFFF59E0B)
+                                            .withOpacity(0.35)),
+                                  ),
+                                  child: const Icon(
+                                    Icons.edit_rounded,
+                                    size: 15,
+                                    color: Color(0xFFD97706),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
-                      ),
-                      Text('₱${p.amount.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                              color: Color(0xFF16A34A),
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14)),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 if (!isLast)
